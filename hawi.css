@@ -1,4 +1,4 @@
-/*! Al-Hawi Medical — core UI (tabs, accordion, modal) + case app | v0.1 */
+/*! Al-Hawi Medical — core UI (tabs, accordion, modal) + case app | v0.1.1 */
 :root{
   --hw-accent:var(--linkB,#0c9784);
   --hw-accent-ink:#0a7a6b;
@@ -14,6 +14,9 @@
   --hw-radius:14px;
 }
 html:not([data-lang=en]) .lng-en,html[data-lang=en] .lng-ar{display:none!important}
+
+/* Plus UI sets svg{fill:currentColor}; keep line icons outlined (avatar svg has no stroke attr, unaffected) */
+.hw-case svg[stroke],.hw-modal svg[stroke],.hw-case svg[stroke] *,.hw-modal svg[stroke] *{fill:none!important}
 
 /* ---------- Tabs ---------- */
 .hw-tabs{display:block}
