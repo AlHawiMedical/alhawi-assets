@@ -13,7 +13,8 @@
   --hw-warn:#b26a00;--hw-warn-soft:rgba(178,106,0,.10);
   --hw-radius:14px;
 }
-html:not([data-lang=en]) .lng-en,html[data-lang=en] .lng-ar{display:none!important}
+/* ar (default) | en | tr — Turkish falls back to English when no .lng-tr sibling exists */
+html:not([data-lang=en]):not([data-lang=tr]) .lng-en,html:not([data-lang=tr]) .lng-tr,html[data-lang=en] .lng-ar,html[data-lang=tr] .lng-ar,html[data-lang=tr] .lng-en:has(~ .lng-tr){display:none!important}
 
 /* Plus UI sets svg{fill:currentColor}; keep line icons outlined (avatar svg has no stroke attr, unaffected) */
 .hw-case svg[stroke],.hw-modal svg[stroke],.hw-case svg[stroke] *,.hw-modal svg[stroke] *{fill:none!important}

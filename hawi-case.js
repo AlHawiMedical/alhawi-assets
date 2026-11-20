@@ -1,34 +1,34 @@
-/*! Al-Hawi Medical — Clinical Case app (Play / Review / Discussion) | v0.1 | requires hawi-core.js */
+/*! Al-Hawi Medical — Clinical Case app (Play / Review / Discussion) | v0.2 (ar/en/tr) | requires hawi-core.js */
 (function (w, d) {
   'use strict';
   var H = w.Hawi; if (!H) return;
   var bi = H.bi, icon = H.icon;
-  function B(ar, en) { return { ar: ar, en: en }; }
+  function B(ar, en, tr) { var o = { ar: ar, en: en }; if (tr) o.tr = tr; return o; }
 
   var L = {
-    play: B('الحالة', 'Play'), review: B('المراجعة', 'Review'), disc: B('المناقشة', 'Discussion'),
-    history: B('القصة المرضية', 'History'), exam: B('الفحص السريري', 'Examination'),
-    inv: B('الاستقصاءات', 'Investigations'), mgmt: B('خطة التدبير', 'Management Plan'),
-    submit: B('أرسل إجاباتك', 'Submit Responses'), selected: B('مختار', 'selected'),
-    yrs: B('سنة', 'years'), m: B('ذكر', 'Male'), f: B('أنثى', 'Female'),
-    emptyT: B('لم تختر شيئاً', 'Nothing Selected'),
-    emptyB: B('لم تحدد أي استقصاء أو خطة علاج. هل تريد إرسال خطة فارغة؟', "You haven't made any choices. Submit an empty plan anyway?"),
-    back: B('رجوع', 'Back'), anyway: B('أرسل على أي حال', 'Submit Anyway'),
-    perfT: B('أداؤك', 'Your Performance'),
-    perfNote: B('تعتمد الدرجة على دقة اختياراتك ومباشرتها؛ الاختيارات الضارة تُنقص الدرجة.', 'Marks depend on clinical accuracy and directness; harmful choices cost marks.'),
-    toReview: B('إلى المراجعة', 'Go to Review'), close: B('إغلاق', 'Close'),
-    chosenOk: B('اختيار صحيح', 'Correct'), chosenBad: B('اختيار غير مناسب', 'Not indicated'),
-    missed: B('فاتك', 'Missed'), neutral: B('محايد', 'Neutral'), none: B('لم تختر شيئاً.', 'None selected.'),
-    lockedMsg: B('أرسل إجاباتك في تبويب الحالة أولاً لفتح هذا القسم.', 'Submit your responses in Play first to unlock this section.'),
-    problem: B('المشكلة الحالية', 'Presenting Problem'), ddx: B('التشخيص التفريقي', 'Differential Diagnosis'),
-    yourResult: B('نتيجتك', 'Your Result'), best: B('الأفضل', 'Best'), attempts: B('المحاولات', 'Attempts'),
-    lHigh: B('الأرجح', 'Most likely'), lMid: B('ممكن', 'Possible'), lLow: B('أقل احتمالاً', 'Less likely'),
-    finalDx: B('التشخيص النهائي', 'Final Diagnosis'),
-    summary: B('الخلاصة السريرية والمحاكمة', 'Clinical Summary & Reasoning'),
-    invExp: B('الاستقصاءات: لماذا؟', 'Investigations: Why?'), mgmtExp: B('التدبير: لماذا؟', 'Management: Why?'),
-    keys: B('نقاط أساسية', 'Key Points'), refs: B('المراجع', 'References'),
-    retry: B('أعد الحالة', 'Retry Case'), top: B('إلى الأعلى', 'Back to Top'),
-    eduNote: B('محتوى تعليمي للطلاب والأطباء، لا يغني عن الدليل العلاجي المحلي ولا عن تقييم المريض.', 'Educational content; it does not replace local guidelines or patient assessment.')
+    play: B('الحالة', 'Play', 'Vaka'), review: B('المراجعة', 'Review', 'Değerlendirme'), disc: B('المناقشة', 'Discussion', 'Tartışma'),
+    history: B('القصة المرضية', 'History', 'Anamnez'), exam: B('الفحص السريري', 'Examination', 'Fizik Muayene'),
+    inv: B('الاستقصاءات', 'Investigations', 'Tetkikler'), mgmt: B('خطة التدبير', 'Management Plan', 'Tedavi Planı'),
+    submit: B('أرسل إجاباتك', 'Submit Responses', 'Yanıtları Gönder'), selected: B('مختار', 'selected', 'seçildi'),
+    yrs: B('سنة', 'years', 'yaş'), m: B('ذكر', 'Male', 'Erkek'), f: B('أنثى', 'Female', 'Kadın'),
+    emptyT: B('لم تختر شيئاً', 'Nothing Selected', 'Seçim Yapılmadı'),
+    emptyB: B('لم تحدد أي استقصاء أو خطة علاج. هل تريد إرسال خطة فارغة؟', "You haven't made any choices. Submit an empty plan anyway?", 'Hiçbir tetkik veya tedavi seçmediniz. Boş plan yine de gönderilsin mi?'),
+    back: B('رجوع', 'Back', 'Geri'), anyway: B('أرسل على أي حال', 'Submit Anyway', 'Yine de Gönder'),
+    perfT: B('أداؤك', 'Your Performance', 'Performansınız'),
+    perfNote: B('تعتمد الدرجة على دقة اختياراتك ومباشرتها؛ الاختيارات الضارة تُنقص الدرجة.', 'Marks depend on clinical accuracy and directness; harmful choices cost marks.', 'Puan, seçimlerinizin klinik doğruluğuna ve isabetine bağlıdır; zararlı seçimler puan kaybettirir.'),
+    toReview: B('إلى المراجعة', 'Go to Review', 'Değerlendirmeye Geç'), close: B('إغلاق', 'Close', 'Kapat'),
+    chosenOk: B('اختيار صحيح', 'Correct', 'Doğru'), chosenBad: B('اختيار غير مناسب', 'Not indicated', 'Endike değil'),
+    missed: B('فاتك', 'Missed', 'Atlandı'), neutral: B('محايد', 'Neutral', 'Nötr'), none: B('لم تختر شيئاً.', 'None selected.', 'Seçim yapılmadı.'),
+    lockedMsg: B('أرسل إجاباتك في تبويب الحالة أولاً لفتح هذا القسم.', 'Submit your responses in Play first to unlock this section.', 'Bu bölümü açmak için önce Vaka sekmesinde yanıtlarınızı gönderin.'),
+    problem: B('المشكلة الحالية', 'Presenting Problem', 'Başvuru Sorunu'), ddx: B('التشخيص التفريقي', 'Differential Diagnosis', 'Ayırıcı Tanı'),
+    yourResult: B('نتيجتك', 'Your Result', 'Sonucunuz'), best: B('الأفضل', 'Best', 'En İyi'), attempts: B('المحاولات', 'Attempts', 'Deneme'),
+    lHigh: B('الأرجح', 'Most likely', 'En olası'), lMid: B('ممكن', 'Possible', 'Olası'), lLow: B('أقل احتمالاً', 'Less likely', 'Daha az olası'),
+    finalDx: B('التشخيص النهائي', 'Final Diagnosis', 'Kesin Tanı'),
+    summary: B('الخلاصة السريرية والمحاكمة', 'Clinical Summary & Reasoning', 'Klinik Özet ve Akıl Yürütme'),
+    invExp: B('الاستقصاءات: لماذا؟', 'Investigations: Why?', 'Tetkikler: Neden?'), mgmtExp: B('التدبير: لماذا؟', 'Management: Why?', 'Tedavi: Neden?'),
+    keys: B('نقاط أساسية', 'Key Points', 'Anahtar Noktalar'), refs: B('المراجع', 'References', 'Kaynaklar'),
+    retry: B('أعد الحالة', 'Retry Case', 'Vakayı Tekrarla'), top: B('إلى الأعلى', 'Back to Top', 'Başa Dön'),
+    eduNote: B('محتوى تعليمي للطلاب والأطباء، لا يغني عن الدليل العلاجي المحلي ولا عن تقييم المريض.', 'Educational content; it does not replace local guidelines or patient assessment.', 'Öğrenciler ve hekimler için eğitim içeriğidir; yerel kılavuzların ve hasta değerlendirmesinin yerini tutmaz.')
   };
 
   /* original, neutral avatar (replace with the case image via data.image) */

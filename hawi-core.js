@@ -1,8 +1,8 @@
-/*! Al-Hawi Medical — core: i18n helpers, tabs engine, accordion, modal, storage | v0.1 */
+/*! Al-Hawi Medical — core: i18n helpers (ar/en/tr), tabs engine, accordion, modal, storage | v0.2 */
 (function (w, d) {
   'use strict';
   var H = w.Hawi = w.Hawi || {};
-  H.version = '0.1.0';
+  H.version = '0.2.0';
   H.apps = H.apps || {};
 
   /* ---------- text & i18n ---------- */
@@ -10,23 +10,30 @@
   H.esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return ESC[c]; }); };
   /* minimal markup: **bold** */
   H.fmt = function (s) { return H.esc(s).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>'); };
+  H.LANGS = ['ar', 'en', 'tr'];
   H.lang = function () {
     if (w.hawiLang && w.hawiLang.get) return w.hawiLang.get();
-    return d.documentElement.getAttribute('data-lang') === 'en' ? 'en' : 'ar';
+    var l = d.documentElement.getAttribute('data-lang');
+    return H.LANGS.indexOf(l) > -1 ? l : 'ar';
   };
-  /* bilingual value -> both spans (switching needs no re-render) */
+  function has(s) { return s != null && String(s).trim() !== ''; }
+  /* multilingual value -> one span per language (switching needs no re-render).
+     tr is optional: when missing, Turkish readers see the English span (CSS fallback). */
   H.bi = function (v) {
     if (v == null) return '';
     if (typeof v !== 'object') return H.fmt(v);
-    var ar = v.ar != null ? v.ar : v.en, en = v.en != null ? v.en : v.ar;
-    if (ar === en) return H.fmt(ar);
-    return '<span class="lng-ar" lang="ar">' + H.fmt(ar) + '</span><span class="lng-en" lang="en">' + H.fmt(en) + '</span>';
+    var ar = v.ar != null ? v.ar : v.en, en = v.en != null ? v.en : v.ar, tr = has(v.tr) ? v.tr : null;
+    if (ar === en && (tr == null || tr === en)) return H.fmt(ar);
+    return '<span class="lng-ar" lang="ar">' + H.fmt(ar) + '</span><span class="lng-en" lang="en">' + H.fmt(en) + '</span>' +
+      (tr != null ? '<span class="lng-tr" lang="tr">' + H.fmt(tr) + '</span>' : '');
   };
   /* plain text in the current language (attributes, aria) */
   H.t = function (v) {
     if (v == null) return '';
     if (typeof v !== 'object') return String(v);
-    return (H.lang() === 'en' ? (v.en != null ? v.en : v.ar) : (v.ar != null ? v.ar : v.en)) || '';
+    var l = H.lang();
+    if (l === 'tr' && has(v.tr)) return v.tr;
+    return (l === 'ar' ? (v.ar != null ? v.ar : v.en) : (v.en != null ? v.en : v.ar)) || '';
   };
 
   /* ---------- data encoding (HW1) ----------
