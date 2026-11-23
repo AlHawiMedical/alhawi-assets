@@ -1,4 +1,4 @@
-/*! Al-Hawi Medical — ECG Academy: strip engine + Library | v0.1.1 (ar/en/tr) | requires hawi-core.js */
+/*! Al-Hawi Medical — ECG Academy: strip engine + Library | v0.2 (ar/en/tr) | requires hawi-core.js */
 (function (w, d) {
   'use strict';
   var H = w.Hawi; if (!H) return;
@@ -16,13 +16,13 @@
      chunk: { P:[{t}], Q:[{t, d, k, rr, p}], until } — k: 'n' narrow, 'v' ventricular/wide.
      q.p = time of the P wave that conducted this QRS (for PR), or null. */
   var GEN = {
-    /* sinus (normal, brady, tachy, 1st-degree block via pr), optional respiratory variation `ra` */
+    /* sinus family: normal, arrhythmia (ra), tachy/brady, 1st-degree block (pr), AT (pk), AVNRT (noP), LBBB/RBBB/WPW (k) */
     sinus: function (sp) {
       var t = 0.25, base = 60 / sp.rate, ra = sp.ra || 0, prev = base;
       return function () {
         var rr = base * (1 + ra * Math.sin(2 * Math.PI * t / 4.5));
-        var q = { t: t + sp.pr, d: sp.qrs, k: sp.qrs >= 0.12 ? 'v' : 'n', rr: prev, p: t };
-        var out = { P: [{ t: t }], Q: [q], until: t + rr };
+        var q = { t: t + sp.pr, d: sp.qrs, k: kind(sp), rr: prev, p: t };
+        var out = { P: sp.noP ? [] : [{ t: t }], Q: [q], until: t + rr };
         prev = rr; t += rr; return out;
       };
     },
@@ -36,7 +36,7 @@
         if (sp.mode === 'w') pr = prs[Math.min(pos, prs.length - 1)]; else pr = sp.pr || 0.16;
         var out = { P: [{ t: t }], Q: [], until: t + pp };
         if (conducted) {
-          var qt = t + pr, q = { t: qt, d: sp.qrs, k: sp.qrs >= 0.12 ? 'v' : 'n', rr: lastQ == null ? pp : qt - lastQ, p: t };
+          var qt = t + pr, q = { t: qt, d: sp.qrs, k: kind(sp), rr: lastQ == null ? pp : qt - lastQ, p: t };
           out.Q.push(q); lastQ = qt;
         }
         i++; t += pp; return out;
@@ -49,7 +49,7 @@
         var out = { P: [], Q: [], until: 0 };
         until += 1.0;
         while (tp < until) { out.P.push({ t: tp }); tp += pp * (1 + (R() - 0.5) * 0.02); }
-        while (tq < until) { out.Q.push({ t: tq, d: sp.qrs, k: sp.qrs >= 0.12 ? 'v' : 'n', rr: rr, p: null }); tq += rr; }
+        while (tq < until) { out.Q.push({ t: tq, d: sp.qrs, k: kind(sp), rr: rr, p: null }); tq += rr; }
         out.until = until; return out;
       };
     },
@@ -68,18 +68,80 @@
       return function () {
         var out = { P: [], Q: [], until: t + rr };
         if ((i + 1) % every === 0) {
-          /* sinus P falls inside the ectopic beat and is not conducted (not drawn) */
           var prevQ = t - rr + sp.pr;
           out.Q.push({ t: prevQ + cpl * rr, d: sp.vqrs || 0.15, k: 'v', rr: cpl * rr, p: null });
         } else {
           out.P.push({ t: t });
-          var after = i > 0 && i % every === 0; /* first sinus beat after the ectopic */
+          var after = i > 0 && i % every === 0;
           out.Q.push({ t: t + sp.pr, d: sp.qrs, k: 'n', rr: after ? (2 - cpl) * rr : rr, p: t });
         }
         i++; t += rr; return out;
       };
-    }
+    },
+    /* premature atrial / junctional beats (alt: alternate a, j), non-compensatory pause (sinus node reset) */
+    pac: function (sp) {
+      var t = 0.25, rr = 60 / sp.rate, i = 0, every = sp.every || 4, cpl = sp.coupling || 0.62, lastQ = null, nPrem = 0;
+      return function () {
+        var out = { P: [], Q: [], until: 0 };
+        if (lastQ != null && (i + 1) % every === 0) {
+          var typ = sp.alt ? (nPrem % 2 ? 'j' : 'a') : (sp.type || 'a'); nPrem++;
+          var qt = lastQ + cpl * rr;
+          if (typ === 'a') { out.P.push({ t: qt - 0.15, pk: 'abn' }); out.Q.push({ t: qt, d: sp.qrs, k: 'n', rr: cpl * rr, p: qt - 0.15 }); t = qt - 0.15 + rr; }
+          else { out.P.push({ t: qt - 0.07, pk: 'inv' }); out.Q.push({ t: qt, d: sp.qrs, k: 'n', rr: cpl * rr, p: qt - 0.07 }); t = qt - 0.07 + rr; }
+          lastQ = qt;
+        } else {
+          out.P.push({ t: t }); var q = t + sp.pr;
+          out.Q.push({ t: q, d: sp.qrs, k: 'n', rr: lastQ == null ? rr : q - lastQ, p: t }); lastQ = q; t += rr;
+        }
+        i++; out.until = t - 0.05; return out;
+      };
+    },
+    /* sinus beats, sinus arrest, then an escape rhythm (type a | j | v at erate) for m beats; repeats */
+    esc: function (sp) {
+      var rr = 60 / sp.rate, err = 60 / sp.erate, n = sp.n || 3, m = sp.m || 3, i = 0, t = 0.25, lastQ = null;
+      return function () {
+        var out = { P: [], Q: [], until: 0 }, pos = i % (n + m);
+        if (pos < n) {
+          if (pos === 0 && lastQ != null) t = lastQ + rr - sp.pr;
+          out.P.push({ t: t }); var q = t + sp.pr;
+          out.Q.push({ t: q, d: sp.qrs, k: 'n', rr: lastQ == null ? rr : q - lastQ, p: t }); lastQ = q; t += rr;
+        } else {
+          var qe = lastQ + err;
+          if (sp.type === 'a') { out.P.push({ t: qe - 0.15, pk: 'abn' }); out.Q.push({ t: qe, d: sp.qrs, k: 'n', rr: err, p: qe - 0.15 }); }
+          else if (sp.type === 'j') { out.P.push({ t: qe + sp.qrs + 0.03, pk: 'inv' }); out.Q.push({ t: qe, d: sp.qrs, k: 'n', rr: err, p: null }); }
+          else out.Q.push({ t: qe, d: sp.vqrs || 0.15, k: 'v', rr: err, p: null });
+          lastQ = qe;
+        }
+        i++; out.until = lastQ - 0.05; return out;
+      };
+    },
+    /* regular beats with no conducted P: VT, ventricular escape, paced rhythm (k 'p') */
+    vent: function (sp) {
+      var t = 0.3, rr = 60 / sp.rate;
+      return function () { var out = { P: [], Q: [{ t: t, d: sp.qrs, k: sp.k || 'v', rr: rr, p: null }], until: t + rr - 0.05 }; t += rr; return out; };
+    },
+    /* multifocal atrial tachycardia: ≥3 P morphologies, varying PR and RR */
+    mat: function (sp, R) {
+      var t = 0.25, mean = 60 / sp.rate, lastQ = null, shapes = ['n', 'abn', 'pul', 'inv', 'm'];
+      return function () {
+        var pk = shapes[Math.floor(R() * shapes.length)], pr = 0.12 + R() * 0.09, q = t + pr;
+        var out = { P: [{ t: t, pk: pk }], Q: [{ t: q, d: sp.qrs, k: 'n', rr: lastQ == null ? mean : q - lastQ, p: t }], until: t };
+        lastQ = q; t += clamp(mean * (0.72 + 0.56 * R()), 0.38, 0.85); out.until = t - 0.02; return out;
+      };
+    },
+    /* atrial flutter: sawtooth F waves at frate, conducted ratio:1 */
+    flut: function (sp) {
+      var fp = 60 / (sp.frate || 300), k = 0, ratio = sp.ratio || 4;
+      return function () {
+        var q = 0.2 + k * ratio * fp + 0.27;
+        var out = { P: [], Q: [{ t: q, d: sp.qrs, k: 'n', rr: ratio * fp, p: null }], until: q };
+        k++; return out;
+      };
+    },
+    /* continuous rhythms without discrete beats: vf, tdp, flat (asystole) */
+    cont: function () { var t = 0; return function () { t += 1; return { P: [], Q: [], until: t }; }; }
   };
+  function kind(sp) { return sp.k || (sp.qrs >= 0.12 ? 'v' : 'n'); }
   E.GEN = GEN;
 
   function Stream(spec, seed) {
@@ -101,30 +163,68 @@
     while (this.P.length && this.P[0].t < cut) this.P.shift();
     while (this.Q.length && this.Q[0].t < cut) this.Q.shift();
   };
+  function sig(x) { return 1 / (1 + Math.exp(-x)); }
+  function pwave(t, e, sp) {
+    var c = e.t, k = e.pk || sp.pk || 'n', a = sp.pAmp || 0.15;
+    if (k === 'inv') return g(t, c + 0.04, 0.018, -0.11);
+    if (k === 'abn') return g(t, c + 0.035, 0.015, 0.09) + g(t, c + 0.075, 0.016, -0.06);
+    if (k === 'pul') return g(t, c + 0.045, 0.019, 0.3);
+    if (k === 'm') return g(t, c + 0.04, 0.022, 0.15) + g(t, c + 0.1, 0.024, 0.17);
+    return g(t, c + 0.05, 0.022, a);
+  }
+  /* QRS + ST + T for one beat */
+  function beat(t, e, sp) {
+    var D = e.d, q0 = e.t, k = e.k, v = 0, tA, tW = 0.042;
+    if (k === 'v') { v = g(t, q0 + 0.42 * D, 0.17 * D, 1.25) + g(t, q0 + 0.86 * D, 0.11 * D, -0.38); tA = -0.42; }
+    else if (k === 'l' || k === 'p') {
+      var o = 0;
+      if (k === 'p') { v += g(t, q0, 0.0035, 1.4); o = 0.02; }
+      v += g(t, q0 + o + 0.36 * D, 0.13 * D, 0.82) + g(t, q0 + o + 0.68 * D, 0.12 * D, 0.86); tA = -0.32;
+    }
+    else if (k === 'r') { v = g(t, q0 + 0.12 * D, 0.05 * D, 0.22) + g(t, q0 + 0.36 * D, 0.08 * D, -0.5) + g(t, q0 + 0.72 * D, 0.11 * D, 0.95); tA = -0.24; }
+    else if (k === 'w') { v = g(t, q0 + 0.3 * D, 0.2 * D, 0.42) + g(t, q0 + 0.66 * D, 0.09 * D, 0.85) + g(t, q0 + 0.9 * D, 0.06 * D, -0.15); tA = 0.2; }
+    else { v = g(t, q0 + 0.15 * D, 0.06 * D, -0.08) + g(t, q0 + 0.45 * D, 0.12 * D, 1.1) + g(t, q0 + 0.8 * D, 0.08 * D, -0.22); tA = 0.28; }
+    var qt = clamp(0.4 * Math.sqrt(e.rr || 0.8), 0.26, 0.46) + (k === 'n' || k === 'w' ? 0 : 0.04);
+    if (sp.qtx) qt *= sp.qtx;
+    if (sp.tAmp != null && k === sp.tk) tA = sp.tAmp;
+    if (sp.st && (k === 'n')) v += sp.st * (sig((t - q0 - D - 0.01) / 0.008) - sig((t - q0 - qt + 0.05) / 0.025));
+    if (sp.dig && k === 'n') { v += g(t, q0 + D + 0.1, 0.055, -0.21); tA = 0.07; tW = 0.03; }
+    return v + g(t, q0 + qt - 0.075, tW, tA);
+  }
   /* signal at time t (mV) */
   Stream.prototype.v = function (t) {
     this.ensure(t);
-    var v = 0, i, e;
+    var sp = this.sp, v = 0, i, e;
+    if (sp.r === 'cont') return this.cv(t);
     for (i = 0; i < this.P.length; i++) {
       e = this.P[i]; if (e.t > t + 0.3) break; if (e.t < t - 0.3) continue;
-      v += g(t, e.t + 0.05, 0.022, this.sp.pAmp || 0.15);
+      v += pwave(t, e, sp);
     }
     for (i = 0; i < this.Q.length; i++) {
       e = this.Q[i]; if (e.t > t + 0.3) break; if (e.t < t - 0.8) continue;
-      var D = e.d, q0 = e.t;
-      if (e.k === 'v') {
-        v += g(t, q0 + 0.42 * D, 0.17 * D, 1.25) + g(t, q0 + 0.86 * D, 0.11 * D, -0.38);
-      } else {
-        v += g(t, q0 + 0.15 * D, 0.06 * D, -0.08) + g(t, q0 + 0.45 * D, 0.12 * D, 1.1) + g(t, q0 + 0.8 * D, 0.08 * D, -0.22);
-      }
-      var qt = clamp(0.4 * Math.sqrt(e.rr || 0.8), 0.3, 0.46) + (e.k === 'v' ? 0.04 : 0);
-      v += g(t, q0 + qt - 0.075, 0.042, e.k === 'v' ? -0.42 : 0.28);
+      v += beat(t, e, sp);
     }
-    if (this.fib) {
-      var ph = this.ph;
-      v += 0.035 * Math.sin(6.283 * 5.3 * t + ph[0]) + 0.025 * Math.sin(6.283 * 7.4 * t + ph[1]) + 0.02 * Math.sin(6.283 * 3.9 * t + ph[2]) * Math.sin(6.283 * 0.4 * t);
+    var ph = this.ph;
+    if (this.fib) v += 0.035 * Math.sin(6.283 * 5.3 * t + ph[0]) + 0.025 * Math.sin(6.283 * 7.4 * t + ph[1]) + 0.02 * Math.sin(6.283 * 3.9 * t + ph[2]) * Math.sin(6.283 * 0.4 * t);
+    if (sp.r === 'flut') { /* negative sawtooth in II: brisk downstroke, slow return */
+      var x = ((t - 0.2) * (sp.frate || 300) / 60) % 1; if (x < 0) x += 1;
+      var A = 0.22, f = x < 0.22 ? -A * (x / 0.22) : -A * (1 - (x - 0.22) / 0.78);
+      v += f + A / 2;
     }
     return v;
+  };
+  /* continuous waveforms */
+  Stream.prototype.cv = function (t) {
+    var ph = this.ph, sp = this.sp;
+    if (sp.mode === 'tdp') { /* polymorphic VT twisting around the baseline */
+      var env = Math.sin(Math.PI * t / 2.3 + ph[0]);
+      return 0.92 * env * Math.sin(6.283 * 4.0 * t + 0.6 * Math.sin(6.283 * 0.7 * t)) + 0.08 * Math.sin(6.283 * 8.1 * t + ph[1]);
+    }
+    if (sp.mode === 'vf') {
+      var a = 0.28 + 0.15 * Math.sin(6.283 * 0.31 * t + ph[0]) + 0.1 * Math.sin(6.283 * 0.83 * t + ph[1]);
+      return a * (Math.sin(6.283 * 5.1 * t + ph[2]) + 0.6 * Math.sin(6.283 * 7.3 * t + 2 * Math.sin(6.283 * 0.5 * t)) + 0.35 * Math.sin(6.283 * 3.2 * t + ph[1]));
+    }
+    return 0.025 * Math.sin(6.283 * 0.25 * t + ph[0]) + 0.006 * Math.sin(6.283 * 9 * t);
   };
   /* QRS onset times in (a, b] — used for the optional beep */
   Stream.prototype.beatsIn = function (a, b) {
@@ -143,7 +243,7 @@
     var pts = [], x, t;
     /* calibration pulse 1 mV × 0.2 s */
     pts.push('M0,' + base, 'L1.5,' + base, 'L1.5,' + (base - 10), 'L6.5,' + (base - 10), 'L6.5,' + base, 'L10,' + base);
-    for (x = 0; x <= sec * 25; x += 0.2) {
+    for (x = 0; x <= sec * 25; x += 0.1) {
       t = 0.4 + x / 25;
       pts.push('L' + (10 + x).toFixed(1) + ',' + (base - 10 * s.v(t)).toFixed(2));
     }
@@ -152,7 +252,7 @@
       '<defs><pattern id="' + id + 's" width="1" height="1" patternUnits="userSpaceOnUse"><path d="M1 0V1H0" fill="none" class="ecg-g1"/></pattern>' +
       '<pattern id="' + id + 'b" width="5" height="5" patternUnits="userSpaceOnUse"><rect width="5" height="5" fill="url(#' + id + 's)"/><path d="M5 0V5H0" fill="none" class="ecg-g5"/></pattern></defs>' +
       '<rect width="' + W + '" height="' + Hh + '" class="ecg-pbg"/><rect width="' + W + '" height="' + Hh + '" fill="url(#' + id + 'b)"/>' +
-      '<path d="' + pts.join('') + '" class="ecg-trace"/><text x="12" y="4" class="ecg-lead">II</text></svg></div>';
+      '<path d="' + pts.join('') + '" class="ecg-trace"/><text x="12" y="4" class="ecg-lead">' + H.esc(spec.lead || 'II') + '</text></svg></div>';
   };
 
   /* =====================================================================
@@ -255,6 +355,7 @@
         c.stroke();
       }
     }
+    if (this.s.sp.lead) { c.fillStyle = 'rgba(201,255,245,.75)'; c.font = '700 ' + Math.round(12 * dpr) + 'px sans-serif'; c.fillText(this.s.sp.lead, 8 * dpr, 16 * dpr); }
     if (!this.full) { /* bright head dot */
       var hy = base - this.ys[cur] * sc;
       c.fillStyle = '#c9fff5'; c.beginPath(); c.arc(cur, hy, 2.6 * dpr, 0, 6.283); c.fill();
