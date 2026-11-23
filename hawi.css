@@ -1,4 +1,4 @@
-/*! Al-Hawi Medical — core UI (tabs, accordion, modal) + case app | v0.1.1 */
+/*! AlHawi Medical — core UI (tabs, accordion, modal) + case app | v0.2.1 */
 :root{
   --hw-accent:var(--linkB,#0c9784);
   --hw-accent-ink:#0a7a6b;
@@ -12,6 +12,17 @@
   --hw-bad:#c4352b;--hw-bad-soft:rgba(196,53,43,.09);
   --hw-warn:#b26a00;--hw-warn-soft:rgba(178,106,0,.10);
   --hw-radius:14px;
+  --hw-box:rgba(20,33,43,.38);
+}
+/* Plus UI dark mode (.drK): light-on-dark lines and text */
+.drK{
+  --hw-accent-ink:#4fd1bd;
+  --hw-accent-soft:rgba(79,209,189,.12);
+  --hw-muted:rgba(255,255,255,.64);
+  --hw-bg-soft:rgba(255,255,255,.05);
+  --hw-line:rgba(255,255,255,.16);
+  --hw-box:rgba(255,255,255,.5);
+  --hw-ok-soft:rgba(46,180,104,.16);--hw-bad-soft:rgba(230,80,70,.16);--hw-warn-soft:rgba(230,150,40,.16);
 }
 /* ar (default) | en | tr — Turkish falls back to English when no .lng-tr sibling exists */
 html:not([data-lang=en]):not([data-lang=tr]) .lng-en,html:not([data-lang=tr]) .lng-tr,html[data-lang=en] .lng-ar,html[data-lang=tr] .lng-ar,html[data-lang=tr] .lng-en:has(~ .lng-tr){display:none!important}
@@ -105,7 +116,7 @@ html[dir=rtl] .hw-vitals td{text-align:right}
 .hw-opt{display:flex;align-items:flex-start;gap:12px;width:100%;padding:12px 14px;min-height:50px;border-radius:12px;border:1px solid var(--hw-line);background:var(--hw-bg);color:inherit;font:inherit;font-size:15px;line-height:1.6;text-align:start;cursor:pointer;transition:border-color .15s,background .15s}
 .hw-opt:hover{border-color:var(--hw-accent)}
 .hw-opt:focus-visible{outline:2px solid var(--hw-accent);outline-offset:2px}
-.hw-opt .hw-box{width:22px;height:22px;flex-shrink:0;margin-top:1px;border-radius:6px;border:2px solid var(--hw-line);display:flex;align-items:center;justify-content:center;color:#fff}
+.hw-opt .hw-box{width:22px;height:22px;flex-shrink:0;margin-top:1px;border-radius:6px;border:2px solid var(--hw-box);display:flex;align-items:center;justify-content:center;color:#fff}
 .hw-opt .hw-box svg{width:14px;height:14px;opacity:0}
 .hw-opt[aria-checked=true]{border-color:var(--hw-accent);background:var(--hw-accent-soft)}
 .hw-opt[aria-checked=true] .hw-box{background:var(--hw-accent);border-color:var(--hw-accent)}
@@ -163,4 +174,31 @@ html[dir=rtl] .hw-vitals td{text-align:right}
   .hw-best{display:none}
 }
 @media (prefers-reduced-motion:reduce){.hw-panel,.hw-modal,.hw-tab.shake{animation:none}}
+/* ---------- v0.2: results, media, level, links, mistakes log ---------- */
+.hw-r{display:block;margin-top:8px;padding:8px 10px;border-radius:10px;background:var(--hw-bg-soft);border-inline-start:3px solid var(--hw-accent);font-size:14px;line-height:1.7;color:var(--hw-ink)}
+.hw-media{display:block;margin-top:8px;cursor:zoom-in;border-radius:10px;overflow:hidden;border:1px solid var(--hw-line);background:#fff}
+.hw-media img{display:block;width:100%;height:auto;max-height:220px;object-fit:contain;background:#fff}
+.hw-media-c{display:block;padding:5px 8px;font-size:12px;color:var(--hw-muted)}
+.hw-media:focus-visible{outline:2px solid var(--hw-accent);outline-offset:2px}
+.hw-zoom{display:block;width:100%;height:auto;border-radius:10px;background:#fff}
+.hw-modal-box:has(.hw-zoom){max-width:960px}
+.hw-invres{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+.hw-invres li{padding:10px 12px;border-radius:12px;border:1px solid var(--hw-line)}
+.hw-lvl{display:inline-block;margin-inline-start:6px;padding:1px 8px;border-radius:999px;font-size:11.5px;font-weight:800;vertical-align:1px}
+.hw-lvl.lv-1{background:var(--hw-ok-soft);color:var(--hw-ok)}
+.hw-lvl.lv-2{background:var(--hw-warn-soft);color:var(--hw-warn)}
+.hw-lvl.lv-3{background:var(--hw-bad-soft);color:var(--hw-bad)}
+.hw-links{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.hw-links a{display:block;padding:10px 12px;border-radius:10px;background:var(--hw-accent-soft);color:var(--hw-accent-ink);font-weight:700;text-decoration:none}
+.hw-links a:hover{background:var(--hw-accent);color:#fff}
+.hw-stats{display:flex;gap:10px;margin-top:10px}
+.hw-stats div{flex:1;padding:12px;border-radius:12px;background:var(--hw-bg-soft);text-align:center;font-size:12.5px;color:var(--hw-muted)}
+.hw-stats b{display:block;font-size:22px;color:var(--hw-accent-ink);direction:ltr}
+.hw-log-h{display:flex;gap:12px;align-items:center}
+.hw-log-h b{display:block;font-size:16px;line-height:1.4}
+.hw-log-h small{display:block;font-size:12px;color:var(--hw-muted)}
+.hw-ring--sm{width:56px;height:56px}.hw-ring--sm span{width:44px;height:44px;font-size:15px}
+.hw-log-l{margin:0;padding-inline-start:20px;font-size:14px;line-height:1.7}
+.hw-log-l.l-miss li::marker{color:var(--hw-warn)}.hw-log-l.l-bad li::marker{color:var(--hw-bad)}
+.hw-log .hw-acts{margin-top:10px}
 .hw-seo{line-height:1.85}.hw-seo p{margin:0 0 8px}
