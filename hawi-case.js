@@ -1,6 +1,7 @@
-/*! AlHawi Medical — Clinical Case app (Play / Review / Discussion) | v0.3 (ar/en/tr) | requires hawi-core.js
+/*! Clinical Case app (Play / Review / Discussion) | v0.3.1 (ar/en/tr) | requires hawi-core.js
     v0.3: investigation results (r) + media, meta (level, tags), discussion links + related posts by tag,
-          personal log of mistakes (data-view="progress") */
+          personal log of mistakes (data-view="progress")
+    v0.3.1: no platform name in code; related posts work on any domain */
 (function (w, d) {
   'use strict';
   var H = w.Hawi; if (!H) return;
@@ -34,7 +35,7 @@
     noInv: B('لم تطلب أي استقصاء.', 'You ordered no investigations.', 'Hiç tetkik istemediniz.'),
     zoom: B('اضغط للتكبير', 'Tap to enlarge', 'Büyütmek için dokunun'),
     lv1: B('مبتدئ', 'Beginner', 'Başlangıç'), lv2: B('متوسط', 'Intermediate', 'Orta'), lv3: B('متقدم', 'Advanced', 'İleri'),
-    more: B('للتعمّق', 'Learn More', 'Daha Fazlası'), related: B('مواد ذات صلة في الحاوي', 'Related on AlHawi', "AlHawi'de İlgili İçerik"),
+    more: B('للتعمّق', 'Learn More', 'Daha Fazlası'), related: B('مواد ذات صلة', 'Related Content', 'İlgili İçerik'),
     myLog: B('سجلّ أخطائي', 'My Mistakes Log', 'Hata Kaydım'),
     logEmpty: B('لم تحلّ أي حالة بعد على هذا الجهاز.', 'No cases solved on this device yet.', 'Bu cihazda henüz vaka çözülmedi.'),
     logIntro: B('الحالات التي حللتها على هذا الجهاز، مرتبة من الأضعف إلى الأقوى. أعد الحالات ذات الدرجة المنخفضة.', 'Cases you solved on this device, weakest first. Retry the low-scoring ones.', 'Bu cihazda çözdüğünüz vakalar, en zayıftan başlayarak. Düşük puanlıları tekrarlayın.'),
@@ -125,7 +126,7 @@
   function related(box, tags, selfUrl) {
     function drop() { var det = box.closest('details'); box.remove(); if (det && !det.querySelector('a')) det.remove(); }
     tags = (tags || []).map(slug).filter(Boolean).slice(0, 3);
-    if (!tags.length || !/blogspot\.com$|alhawi/i.test(location.hostname)) { setTimeout(drop, 0); return; }
+    if (!tags.length || !d.querySelector('link[type="application/atom+xml"]')) { setTimeout(drop, 0); return; }
     var seen = {}, items = [], left = tags.length;
     tags.forEach(function (tag) {
       fetch('/feeds/posts/summary/-/' + encodeURIComponent(tag) + '?alt=json&max-results=8')

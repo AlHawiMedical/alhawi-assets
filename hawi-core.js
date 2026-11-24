@@ -1,4 +1,4 @@
-/*! Al-Hawi Medical — core: i18n helpers (ar/en/tr), tabs engine, accordion, modal, storage | v0.2 */
+/*! Core: i18n helpers (ar/en/tr), tabs engine, accordion, modal, storage | v0.2 */
 (function (w, d) {
   'use strict';
   var H = w.Hawi = w.Hawi || {};

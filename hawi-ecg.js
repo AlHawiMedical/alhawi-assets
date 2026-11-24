@@ -1,4 +1,4 @@
-/*! Al-Hawi Medical — ECG Academy: strip engine + Library | v0.2.3 (ar/en/tr) | requires hawi-core.js */
+/*! ECG Academy: strip engine + Library | v0.2.3 (ar/en/tr) | requires hawi-core.js */
 (function (w, d) {
   'use strict';
   var H = w.Hawi; if (!H) return;
