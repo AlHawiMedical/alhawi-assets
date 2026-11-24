@@ -1,4 +1,4 @@
-/*! Core UI (tabs, accordion, modal) + case app | v0.2.1 */
+/*! Core UI (tabs, accordion, modal) + case app | v0.2.2 */
 :root{
   --hw-accent:var(--linkB,#0c9784);
   --hw-accent-ink:#0a7a6b;
@@ -202,3 +202,5 @@ html[dir=rtl] .hw-vitals td{text-align:right}
 .hw-log-l.l-miss li::marker{color:var(--hw-warn)}.hw-log-l.l-bad li::marker{color:var(--hw-bad)}
 .hw-log .hw-acts{margin-top:10px}
 .hw-seo{line-height:1.85}.hw-seo p{margin:0 0 8px}
+/* line icons (H.icon): the theme may fill svg paths, which turns a check mark into a filled triangle */
+[data-hawi-app] svg[fill=none] *,.hw-modal svg[fill=none] *{fill:none!important}

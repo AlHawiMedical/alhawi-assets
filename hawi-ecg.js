@@ -1,4 +1,4 @@
-/*! ECG Academy: strip engine + Library + Cases + academy shell (tabs, deep links, related) | v0.4.0 (ar/en/tr) | requires hawi-core.js v0.3 */
+/*! ECG Academy: strip engine + Library + Cases + academy shell (tabs, deep links, related) | v0.4.1 (ar/en/tr) | requires hawi-core.js v0.3 */
 (function (w, d) {
   'use strict';
   var H = w.Hawi; if (!H) return;
@@ -644,16 +644,23 @@
     /* a beat counts when its R peak is on the paper; a P when its peak is */
     Q = Q.filter(function (e) { var pk = e.t + 0.45 * e.d; return pk >= t0 && pk <= t1; });
     P = P.filter(function (e) { var pk = e.t + 0.05; return pk >= t0 && pk <= t1; });
-    var rr = [], prs = [];
+    var rr = [], prs = [], prN = [], pk = {}, wide = [], narrow = [];
     for (i = 1; i < Q.length; i++) rr.push(Q[i].t - Q[i - 1].t);
-    Q.forEach(function (q) { if (q.p != null) prs.push(q.t - q.p); });
+    P.forEach(function (e) { pk[e.t.toFixed(4)] = e.pk || ''; });
+    Q.forEach(function (q) {
+      if (q.p != null) { prs.push(q.t - q.p); if (!pk[q.p.toFixed(4)]) prN.push(q.t - q.p); }
+      ((q.d >= 0.12 || q.k !== 'n') ? wide : narrow).push(q.d);
+    });
+    /* PR is read on the ordinary (sinus) beats when there are any */
+    if (prN.length && (spec.r === 'pac' || spec.r === 'esc')) prs = prN;
     var mean = rr.length ? rr.reduce(function (a, b) { return a + b; }, 0) / rr.length : 0;
     function mn(a) { return a.length ? Math.min.apply(null, a) : 0; }
     function mx(a) { return a.length ? Math.max.apply(null, a) : 0; }
     return {
       sec: sec, n: Q.length, nP: P.length, n6: Math.round(Q.length * 60 / sec),
       rate: mean ? Math.round(60 / mean) : 0, rr: mean, rrMin: mn(rr), rrMax: mx(rr),
-      prMin: mn(prs), prMax: mx(prs), prN: prs.length, qrs: spec.qrs || 0
+      prMin: mn(prs), prMax: mx(prs), prN: prs.length, qrs: spec.qrs || 0,
+      nWide: wide.length, nNarrow: narrow.length, qrsW: mx(wide), qrsN: mx(narrow)
     };
   };
   function rateBucket(r) { return r < 60 ? 'lt60' : r <= 100 ? '60-100' : r <= 150 ? '101-150' : 'gt150'; }
@@ -667,8 +674,9 @@
     if (spec.noP || r === 'af' || r === 'vent') a.p = 'none';
     else if (r === 'flut') a.p = 'flutter';
     else if (r === 'avb2' || r === 'chb') a.p = 'more';
-    else if (spec.pk === 'inv' || (r === 'esc' && spec.type === 'j') || (r === 'pac' && spec.type === 'j')) a.p = 'inv';
-    else if (r === 'mat' || r === 'pac' || (spec.pk && spec.pk !== 'n') || (r === 'esc' && spec.type === 'a')) a.p = 'abn';
+    else if (r === 'pac' || r === 'pvc' || r === 'esc') a.p = 'mixed';
+    else if (spec.pk === 'inv') a.p = 'inv';
+    else if (r === 'mat' || (spec.pk && spec.pk !== 'n')) a.p = 'abn';
     else a.p = 'normal';
     if (r === 'chb') a.pr = 'var';
     else if (r === 'avb2' && spec.mode === 'w') a.pr = 'prog';
@@ -677,7 +685,7 @@
     else if (m.prMax < 0.12) a.pr = 'short';
     else if (m.prMin > 0.2005) a.pr = 'long';
     else a.pr = 'normal';
-    a.qrs = (spec.qrs || 0) >= 0.12 ? 'wide' : 'narrow';
+    a.qrs = m.nWide && m.nNarrow ? 'mix' : m.nWide ? 'wide' : 'narrow';
     a.m = m;
     return a;
   };
@@ -688,6 +696,7 @@
       ['reg-irr', B('غير منتظم بنمط (يتكرّر أو يتدرّج)', 'Irregular with a pattern (repeating or gradual)', 'Belirli bir düzende düzensiz (tekrarlayan veya kademeli)')],
       ['irr-irr', B('غير منتظم بلا أي نمط', 'Irregularly irregular', 'Düzensiz olarak düzensiz')]],
     p: [['normal', B('طبيعية: موجبة ومتماثلة، واحدة قبل كل QRS', 'Normal: upright and uniform, one before each QRS', 'Normal: pozitif ve aynı şekilli, her QRS öncesi bir tane')],
+      ['mixed', B('طبيعية، لكن بعض الضربات بلا P أو بـP مختلفة', 'Normal, but some beats have no P or a different P', 'Normal; ancak bazı atımlarda P yok veya farklı')],
       ['abn', B('بشكل غير طبيعي أو متغيّر', 'Abnormal or changing shape', 'Anormal veya değişken şekilli')],
       ['inv', B('مقلوبة (راجعة)', 'Inverted (retrograde)', 'Negatif (retrograd)')],
       ['more', B('موجات P أكثر من مركّبات QRS', 'More P waves than QRS complexes', 'P dalgaları QRS\'lerden fazla')],
@@ -699,7 +708,8 @@
       ['prog', B('يطول تدريجياً ثم تُحجب P', 'Lengthens progressively until a P is blocked', 'Bir P bloke olana dek giderek uzar')],
       ['var', B('متغيّر بلا علاقة ثابتة', 'Varies with no fixed relationship', 'Sabit ilişki olmadan değişken')],
       ['na', B('غير قابل للقياس', 'Not measurable', 'Ölçülemez')]],
-    qrs: [['narrow', B('ضيّق (أقل من 0.12 ثانية)', 'Narrow (< 0.12 s)', 'Dar (< 0,12 sn)')], ['wide', B('عريض (0.12 ثانية أو أكثر)', 'Wide (≥ 0.12 s)', 'Geniş (≥ 0,12 sn)')]]
+    qrs: [['narrow', B('ضيّق (أقل من 0.12 ثانية)', 'Narrow (< 0.12 s)', 'Dar (< 0,12 sn)')], ['wide', B('عريض (0.12 ثانية أو أكثر)', 'Wide (≥ 0.12 s)', 'Geniş (≥ 0,12 sn)')],
+      ['mix', B('ضيّق، مع ضربات عريضة بينها', 'Narrow, with some wide beats among them', 'Dar; aralarında geniş atımlar var')]]
   };
   var STEPS = ['rate', 'rhythm', 'p', 'pr', 'qrs', 'dx'];
   var PTS = { rate: 1, rhythm: 1, p: 1, pr: 1, qrs: 1, dx: 2 };
@@ -774,6 +784,8 @@
       if (m.prMax - m.prMin > 0.005) return T(B('يتراوح PR بين {a} و{b} ثانية.', 'PR ranges from {a} to {b} s.', 'PR {a} ile {b} sn arasında.'), { a: nb(m.prMin), b: nb(m.prMax) });
       return T(B('PR = {a} ثانية ({s} مربعات صغيرة)، وهو ثابت في كل الضربات.', 'PR = {a} s ({s} small squares), the same in every beat.', 'PR = {a} sn ({s} küçük kare), her atımda aynı.'), { a: nb(m.prMin), s: sq(m.prMin) });
     }
+    if (step === 'qrs' && v === 'mix') return T(B('الضربات الضيّقة QRS = {a} ثانية، والعريضة {b} ثانية.', 'The narrow beats have QRS = {a} s; the wide ones {b} s.', 'Dar atımlarda QRS = {a} sn; geniş olanlarda {b} sn.'), { a: nb(m.qrsN), b: nb(m.qrsW) });
+    if (step === 'qrs' && v === 'wide' && m.qrsW) return T(B('QRS = {a} ثانية ({s} مربعات صغيرة).', 'QRS = {a} s ({s} small squares).', 'QRS = {a} sn ({s} küçük kare).'), { a: nb(m.qrsW), s: sq(m.qrsW) });
     if (step === 'qrs') return T(B('QRS = {a} ثانية ({s} مربعات صغيرة).', 'QRS = {a} s ({s} small squares).', 'QRS = {a} sn ({s} küçük kare).'), { a: nb(m.qrs), s: sq(m.qrs) });
     if (step === 'dx' && item) return item.short || item.name;
     return null;
