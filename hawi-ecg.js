@@ -1,4 +1,4 @@
-/*! Al-Hawi Medical — ECG Academy: strip engine + Library | v0.2 (ar/en/tr) | requires hawi-core.js */
+/*! Al-Hawi Medical — ECG Academy: strip engine + Library | v0.2.1 (ar/en/tr) | requires hawi-core.js */
 (function (w, d) {
   'use strict';
   var H = w.Hawi; if (!H) return;
@@ -392,7 +392,7 @@
     pr: B('فاصل PR', 'PR interval', 'PR aralığı'), qrs: B('مركّب QRS', 'QRS complex', 'QRS kompleksi'),
     rel: B('علاقة P بـ QRS', 'P–QRS relationship', 'P–QRS ilişkisi'),
     more: B('اقرأ المزيد', 'Read more', 'Devamını oku'), about: B('الشرح', 'Explanation', 'Açıklama'),
-    monitor: B('شاشة', 'Monitor', 'Monitör'), paper: B('ورق', 'Paper', 'Kâğıt'),
+    monitor: B('مونيتور', 'Monitor', 'Monitör'), paper: B('ورق', 'Paper', 'Kâğıt'),
     play: B('تشغيل', 'Play', 'Oynat'), pause: B('إيقاف', 'Pause', 'Duraklat'),
     sound: B('الصوت', 'Sound', 'Ses'), lib: B('المكتبة', 'Library', 'Kütüphane'),
     hint: B('ورق التخطيط: المربع الصغير 0.04 ثانية × 0.1 ملي فولط، والكبير 0.2 ثانية × 0.5 ملي فولط.', 'ECG paper: small square 0.04 s × 0.1 mV; large square 0.2 s × 0.5 mV.', 'EKG kâğıdı: küçük kare 0,04 sn × 0,1 mV; büyük kare 0,2 sn × 0,5 mV.')
@@ -410,8 +410,9 @@
     '.ecg-view{border-radius:var(--hw-radius,14px);overflow:hidden;border:1px solid var(--hw-line);background:var(--hw-bg)}' +
     '.ecg-screen{position:relative;background:#06161a;line-height:0}' +
     '.ecg-cv{display:block;width:100%}' +
-    '.ecg-bar{display:flex;align-items:center;gap:8px;padding:10px 12px;background:var(--hw-accent,#0c9784);color:#fff}' +
-    '.ecg-bar h3{flex:1;margin:0;font-size:17px;line-height:1.35;color:#fff}' +
+    '.ecg-bar{display:flex;flex-wrap:wrap;align-items:center;gap:8px 8px;padding:10px 12px;background:#0a7a6b;color:#fff}' +
+    '.ecg-bar h3{flex:1 1 100%;margin:0;font-size:16.5px;line-height:1.4;color:#fff;overflow-wrap:anywhere}' +
+    '.ecg-ctl{display:flex;align-items:center;gap:8px;flex-wrap:wrap}' +
     '.ecg-btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-width:40px;height:38px;padding:0 10px;border:1px solid rgba(255,255,255,.45);border-radius:10px;background:rgba(255,255,255,.12);color:#fff;font:inherit;font-size:13px;font-weight:700;cursor:pointer}' +
     '.ecg-btn:focus-visible{outline:2px solid #fff;outline-offset:2px}' +
     '.ecg-btn[aria-pressed=true]{background:#fff;color:var(--hw-accent-ink,#0a7a6b)}' +
@@ -464,12 +465,12 @@
     mount.classList.add('ecg');
     mount.innerHTML =
       '<section class="ecg-view">' +
-        '<div class="ecg-bar"><h3 class="js-name"></h3>' +
+        '<div class="ecg-bar"><h3 class="js-name"></h3><div class="ecg-ctl">' +
           '<span class="ecg-seg" role="group"><button type="button" class="ecg-btn js-mode" data-m="monitor">' + H.bi(L.monitor) + '</button>' +
           '<button type="button" class="ecg-btn js-mode" data-m="paper">' + H.bi(L.paper) + '</button></span>' +
           '<button type="button" class="ecg-btn js-play"></button>' +
           '<button type="button" class="ecg-btn js-snd" aria-pressed="false"></button>' +
-        '</div>' +
+        '</div></div>' +
         '<div class="js-stage"></div>' +
       '</section>' +
       '<div class="ecg-more js-more"></div>' +
@@ -509,7 +510,7 @@
     }
     function select(it, scroll) {
       cur = it; pref.id = it.id; H.store.set(key, pref);
-      mount.querySelector('.js-name').innerHTML = H.bi(it.name);
+      mount.querySelector('.js-name').innerHTML = H.bi(it.short || it.name);
       if (mon) mon.set(it.strip); else renderStage();
       renderMore();
       mount.querySelectorAll('.ecg-item').forEach(function (b) { b.setAttribute('aria-current', String(b.getAttribute('data-id') === it.id)); });
@@ -541,7 +542,7 @@
       if (it) select(it, true);
     });
 
-    mount.querySelector('.js-name').innerHTML = H.bi(cur.name);
+    mount.querySelector('.js-name').innerHTML = H.bi(cur.short || cur.name);
     renderStage(); renderMore();
     E.active = function () { return { mon: mon, mode: mode, cur: cur }; }; /* test/debug hook */
   };
