@@ -48,7 +48,7 @@
   };
 
   /* original, neutral avatar (replace with the case image via data.image) */
-  var AVA = '<svg viewBox="0 0 72 72" aria-hidden="true"><rect width="72" height="72" fill="#dff2ee"/><circle cx="36" cy="28" r="13" fill="#f2c9a0"/><path d="M23 25c0-9 6-14 13-14s13 5 13 13c-3-4-8-5-13-5s-10 2-13 6z" fill="#5b3a29"/><path d="M12 72c2-14 12-21 24-21s22 7 24 21z" fill="#0c9784"/><path d="M29 51l7 8 7-8" fill="none" stroke="#fff" stroke-width="2"/></svg>';
+  var AVA = '<svg viewBox="0 0 72 72" aria-hidden="true"><rect width="72" height="72" fill="#dff2ee"/><circle cx="36" cy="28" r="13" fill="#f2c9a0"/><path d="M23 25c0-9 6-14 13-14s13 5 13 13c-3-4-8-5-13-5s-10 2-13 6z" fill="#5b3a29"/><path d="M12 72c2-14 12-21 24-21s22 7 24 21z" fill="#0c9784" style="fill:var(--hw-accent,#0c9784)"/><path d="M29 51l7 8 7-8" fill="none" stroke="#fff" stroke-width="2"/></svg>';
 
   function safeUrl(u) { return /^https:\/\//i.test(String(u || '')) ? String(u) : ''; }
   function slug(s) { return String(s || '').toLowerCase().replace(/[^a-z0-9-]/g, ''); }

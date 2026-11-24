@@ -1,8 +1,9 @@
 /*! Core UI (tabs, accordion, modal) + case app | v0.2.2 */
 :root{
   --hw-accent:var(--linkB,#0c9784);
-  --hw-accent-ink:#0a7a6b;
-  --hw-accent-soft:rgba(12,151,132,.10);
+  --hw-accent-ink:var(--linkC,#0a7a6b);
+  --hw-accent-soft:color-mix(in srgb,var(--hw-accent) 10%,transparent);
+  --hw-accent-deep:color-mix(in srgb,var(--hw-accent) 80%,#000);
   --hw-ink:var(--bodyC,#14212b);
   --hw-muted:rgba(20,33,43,.62);
   --hw-bg:var(--contentB,#fff);
@@ -16,8 +17,9 @@
 }
 /* Plus UI dark mode (.drK): light-on-dark lines and text */
 .drK{
-  --hw-accent-ink:#4fd1bd;
-  --hw-accent-soft:rgba(79,209,189,.12);
+  --hw-accent-ink:var(--linkC,#4fd1bd);
+  --hw-accent-soft:color-mix(in srgb,var(--hw-accent) 12%,transparent);
+  --hw-accent-deep:color-mix(in srgb,var(--hw-accent) 55%,#000);
   --hw-muted:rgba(255,255,255,.64);
   --hw-bg-soft:rgba(255,255,255,.05);
   --hw-line:rgba(255,255,255,.16);
