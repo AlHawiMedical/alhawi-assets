@@ -1,4 +1,4 @@
-/*! ECG Academy: strip engine + Library + Cases + academy shell (tabs, deep links, related) | v0.4.1 (ar/en/tr) | requires hawi-core.js v0.3 */
+/*! ECG Academy: strip engine + Library + Cases + Practice + calipers + academy shell (tabs, deep links, related) | v0.6.0 (ar/en/tr) | requires hawi-core.js v0.3 */
 (function (w, d) {
   'use strict';
   var H = w.Hawi; if (!H) return;
@@ -402,7 +402,6 @@
     sub: B('اقرأ الشريط خطوة بخطوة: السرعة والنظم والموجات والفواصل.', 'Read the strip step by step: rate, rhythm, waves and intervals.', 'Şeridi adım adım okuyun: hız, ritim, dalgalar ve aralıklar.'),
     cases: B('الحالات', 'Cases', 'Vakalar'), train: B('التدريب', 'Practice', 'Alıştırma'), lessons: B('الدروس', 'Lessons', 'Dersler'),
     soon: B('قريباً', 'Coming soon', 'Yakında'),
-    trainSoon: B('شرائط عشوائية بلا نهاية من الزمر التي تختارها، مع فرجار رقمي للقياس.', 'Endless random strips from the groups you choose, with digital calipers.', 'Seçtiğiniz gruplardan sınırsız rastgele şeritler ve dijital pergel.'),
     lessonsSoon: B('دروس التخطيط تُنشر قريباً، وتظهر هنا تلقائياً.', 'ECG lessons are coming soon and will appear here automatically.', 'EKG dersleri yakında yayınlanacak ve burada otomatik olarak görünecek.'),
     loading: B('جارٍ التحميل…', 'Loading…', 'Yükleniyor…'),
     hint: B('ورق التخطيط: المربع الصغير 0.04 ثانية × 0.1 ملي فولط، والكبير 0.2 ثانية × 0.5 ملي فولط.', 'ECG paper: small square 0.04 s × 0.1 mV; large square 0.2 s × 0.5 mV.', 'EKG kâğıdı: küçük kare 0,04 sn × 0,1 mV; büyük kare 0,2 sn × 0,5 mV.')
@@ -436,6 +435,8 @@
     '.ecg-paper{overflow-x:auto;-webkit-overflow-scrolling:touch;background:#fff7f6}' +
     '.ecg-paper svg{display:block;min-width:620px;width:100%;height:auto}' +
     '.ecg-pbg{fill:#fff7f6}.ecg-g1{stroke:#f6c9c4;stroke-width:.06}.ecg-g5{stroke:#ec9a92;stroke-width:.16}' +
+    /* the theme fills svg paths: keep the grid lines and the trace as lines */
+    '.ecg-paper .ecg-g1,.ecg-paper .ecg-g5,.ecg-paper .ecg-trace{fill:none!important}' +
     '.ecg-trace{fill:none;stroke:#14212b;stroke-width:.32;stroke-linejoin:round;stroke-linecap:round}' +
     '.ecg-lead{font:700 3px sans-serif;fill:#14212b}' +
     '.ecg-hint{margin:0;padding:6px 12px;font-size:12px;color:var(--hw-muted);border-top:1px solid var(--hw-line)}' +
@@ -462,7 +463,7 @@
 
   /* =====================================================================
      5. ACADEMY SHELL — tabs (library · cases · practice · lessons) + deep links
-        #library/<id> · #cases[/<set>[/<n>]] · #train · #lessons
+        #library/<id> · #cases[/<set>[/<n>]] · #train[/<group>] · #lessons
      ===================================================================== */
   function route() {
     var h = decodeURIComponent((location.hash || '').slice(1)).split('/');
@@ -483,13 +484,13 @@
     /* the page's own title (Blogger h1) already names the academy: show ours only when there is none */
     var own = d.querySelector('h1');
     mount.innerHTML = '<header class="ecg-head">' + (own ? '' : '<h2>' + H.bi(L.title) + '</h2>') + '<p>' + H.bi(L.sub) + '</p></header><div class="js-top"></div>';
-    var r = route(), lib = null, cs = null;
+    var r = route(), lib = null, cs = null, tr = null;
     var top = H.tabs(mount.querySelector('.js-top'), { variant: 'line', tabs: [
       { id: 'library', label: L.lib, render: function (p) { var x = route(); lib = library(p, data, x.tab === 'library' ? x.a : null); } },
       { id: 'cases', label: L.cases, render: function (p) { var x = route(); cs = casesTab(p, data, x.tab === 'cases' ? x : null); } },
-      { id: 'train', label: L.train, html: soon(L.trainSoon) },
+      { id: 'train', label: L.train, render: function (p) { var x = route(); tr = trainTab(p, data, x.tab === 'train' ? x : null); } },
       { id: 'lessons', label: L.lessons, render: lessons }
-    ], onChange: function (id) { if (ready) setHash(id === 'library' && lib ? 'library/' + lib.cur() : id === 'cases' && cs ? cs.hash() : id); } });
+    ], onChange: function (id) { if (ready) setHash(id === 'library' && lib ? 'library/' + lib.cur() : id === 'cases' && cs ? cs.hash() : id === 'train' && tr ? tr.hash() : id); } });
     var ready = false;
     top.select(r.tab || 'library', { silent: true });
     ready = true;
@@ -498,6 +499,7 @@
       top.select(x.tab);
       if (x.tab === 'library' && x.a && lib) lib.go(x.a, true);
       if (x.tab === 'cases' && cs) cs.go(x.a, x.b);
+      if (x.tab === 'train' && tr && x.a) tr.go(x.a);
     });
   }
 
@@ -838,6 +840,8 @@
     '.ecg-mist li:last-child{border-bottom:0}.ecg-mist button{margin-inline-start:6px;padding:2px 10px;min-height:30px;font-size:13px}' +
     '.ecg-note{margin:10px 0 0;font-size:12.5px;color:var(--hw-muted)}';
 
+  function injectCs() { if (d.getElementById('hawi-ecg-cs-css')) return; var st = d.createElement('style'); st.id = 'hawi-ecg-cs-css'; st.textContent = CS_CSS + TR_CSS; d.head.appendChild(st); }
+
   /* cases data: window.HawiEcgCases (HW1) from hawi-ecg-cases.js next to this script */
   function withCases(cb) {
     if (E.cases) { cb(E.cases); return; }
@@ -858,7 +862,7 @@
     api.go = function (set, n) { api.pend = { a: set, b: n }; if (api.data) open(); };
     panel.classList.add('ecg-cs');
     panel.innerHTML = '<p class="ecg-hint">' + H.bi(L.loading) + '</p>';
-    if (!d.getElementById('hawi-ecg-cs-css')) { var st = d.createElement('style'); st.id = 'hawi-ecg-cs-css'; st.textContent = CS_CSS; d.head.appendChild(st); }
+    injectCs();
     withCases(function (x) {
       if (!x || !x.cases) { panel.innerHTML = '<p class="ecg-hint">' + H.bi(CL.unavailable) + '</p>'; return; }
       api.data = x; open();
@@ -957,6 +961,7 @@
         '<div class="ecg-dots" aria-hidden="true">' + steps.map(function () { return '<i></i>'; }).join('') + '</div>' +
         '<section class="hw-card ecg-q js-q" aria-live="polite"></section>';
       panel.querySelector('.js-back').addEventListener('click', function () { var s = setOf(c.set); if (s) showSet(s); else showList(); top(); });
+      calipers(panel.querySelector('.ecg-view'));
       var qBox = panel.querySelector('.js-q'), dots = panel.querySelectorAll('.ecg-dots i');
       function paintDots() { dots.forEach(function (el, x) { var s = steps[x]; el.className = s in got ? (got[s] === ans[s] ? 'ok' : 'bad') : (x === i ? 'cur' : ''); }); }
       function ask() {
@@ -1027,6 +1032,248 @@
       ask();
     }
     function nextOf(c) { var list = casesOf(c.set); return list[list.indexOf(c) + 1] || null; }
+    return api;
+  }
+
+  /* =====================================================================
+     7. PRACTICE — endless random strips from the chosen groups. Each strip is a
+        variant of a library rhythm with parameters drawn from a safe range, and is
+        accepted only if its reading (E.derive) still matches that rhythm.
+        Deep links: #train · #train/<group>
+     ===================================================================== */
+  function U(R, a, b) { return Math.round((a + R() * (b - a)) * 100) / 100; }
+  function I(R, a, b) { return Math.round(a + R() * (b - a)); }
+  var VARY = {
+    'sinus-rhythm': function (R) { return { r: 'sinus', rate: I(R, 64, 95), pr: U(R, 0.13, 0.19), qrs: U(R, 0.07, 0.1) }; },
+    'sinus-arrhythmia': function (R) { return { r: 'sinus', rate: I(R, 64, 88), ra: U(R, 0.15, 0.22), pr: U(R, 0.13, 0.18), qrs: U(R, 0.07, 0.1) }; },
+    'sinus-tachy': function (R) { return { r: 'sinus', rate: I(R, 106, 145), pr: U(R, 0.12, 0.16), qrs: U(R, 0.07, 0.1) }; },
+    'sinus-brady': function (R) { return { r: 'sinus', rate: I(R, 40, 55), pr: U(R, 0.14, 0.19), qrs: U(R, 0.07, 0.1) }; },
+    'avb-1': function (R) { return { r: 'sinus', rate: I(R, 64, 92), pr: U(R, 0.24, 0.36), qrs: U(R, 0.07, 0.1) }; },
+    'mobitz-1': function (R) { var p = U(R, 0.16, 0.2); return { r: 'avb2', mode: 'w', rate: I(R, 80, 100), n: I(R, 3, 5), prs: [p, p + 0.08, p + 0.13, p + 0.16, p + 0.18], qrs: U(R, 0.07, 0.1) }; },
+    'mobitz-2': function (R) { return { r: 'avb2', mode: 'm2', rate: I(R, 80, 100), n: I(R, 3, 5), pr: U(R, 0.14, 0.19), qrs: U(R, 0.12, 0.15), k: 'l' }; },
+    'avb-21': function (R) { var w = R() < 0.4; return { r: 'avb2', mode: '21', rate: I(R, 76, 100), pr: U(R, 0.14, 0.2), qrs: w ? U(R, 0.12, 0.14) : U(R, 0.07, 0.1), k: w ? 'l' : 'n' }; },
+    'chb': function (R) { var v = I(R, 32, 52); return { r: 'chb', rate: I(R, 70, 95), vrate: v, qrs: v > 44 ? U(R, 0.08, 0.1) : U(R, 0.13, 0.16) }; },
+    'atrial-escape': function (R) { return { r: 'esc', type: 'a', rate: I(R, 66, 80), erate: I(R, 48, 58), n: I(R, 2, 4), m: I(R, 2, 3), pr: U(R, 0.14, 0.18), qrs: U(R, 0.07, 0.1) }; },
+    'junctional-escape': function (R) { return { r: 'esc', type: 'j', rate: I(R, 60, 72), erate: I(R, 40, 52), n: I(R, 2, 3), m: I(R, 3, 4), pr: U(R, 0.14, 0.18), qrs: U(R, 0.07, 0.1) }; },
+    'ventricular-escape': function (R) { return { r: 'esc', type: 'v', rate: I(R, 56, 70), erate: I(R, 26, 38), n: 2, m: I(R, 3, 4), pr: U(R, 0.14, 0.18), qrs: 0.08, vqrs: U(R, 0.14, 0.17) }; },
+    'aivr': function (R) { return { r: 'esc', type: 'v', rate: I(R, 60, 72), erate: I(R, 78, 98), n: 3, m: I(R, 4, 6), pr: U(R, 0.14, 0.18), qrs: 0.08, vqrs: U(R, 0.14, 0.16) }; },
+    'pac-pjc': function (R) { var x = R(); return { r: 'pac', type: x < 0.4 ? 'a' : 'j', alt: x > 0.75, rate: I(R, 64, 88), every: I(R, 3, 5), coupling: U(R, 0.55, 0.68), pr: U(R, 0.14, 0.18), qrs: U(R, 0.07, 0.1) }; },
+    'pvc': function (R) { return { r: 'pvc', rate: I(R, 64, 92), every: I(R, 2, 6), coupling: U(R, 0.5, 0.7), pr: U(R, 0.14, 0.18), qrs: U(R, 0.07, 0.1), vqrs: U(R, 0.14, 0.17) }; },
+    'atrial-tachy': function (R) { return { r: 'sinus', rate: I(R, 156, 200), pr: U(R, 0.12, 0.15), qrs: U(R, 0.07, 0.1), pk: 'abn' }; },
+    'mat': function (R) { return { r: 'mat', rate: I(R, 108, 135), qrs: U(R, 0.07, 0.1) }; },
+    'af': function (R) { return { r: 'af', rate: I(R, 70, 140), qrs: U(R, 0.07, 0.1) }; },
+    'flutter': function (R) { return { r: 'flut', frate: I(R, 280, 320), ratio: R() < 0.5 ? 2 : 4, qrs: U(R, 0.07, 0.1) }; },
+    'avnrt': function (R) { return { r: 'sinus', rate: I(R, 160, 210), pr: 0.1, qrs: U(R, 0.07, 0.1), noP: true }; },
+    'vt': function (R) { return { r: 'vent', rate: I(R, 130, 200), qrs: U(R, 0.14, 0.18) }; },
+    'tdp': function () { return { r: 'cont', mode: 'tdp' }; },
+    'vf': function () { return { r: 'cont', mode: 'vf' }; },
+    'asystole': function () { return { r: 'cont', mode: 'flat' }; },
+    'lbbb': function (R) { return { r: 'sinus', rate: I(R, 64, 95), pr: U(R, 0.14, 0.19), qrs: U(R, 0.13, 0.16), k: 'l' }; },
+    'rbbb': function (R) { return { r: 'sinus', rate: I(R, 64, 95), pr: U(R, 0.14, 0.19), qrs: U(R, 0.12, 0.14), k: 'r', lead: 'V1' }; },
+    'wpw': function (R) { return { r: 'sinus', rate: I(R, 64, 95), pr: U(R, 0.09, 0.11), qrs: U(R, 0.12, 0.13), k: 'w' }; },
+    'lae': function (R) { return { r: 'sinus', rate: I(R, 64, 90), pr: U(R, 0.15, 0.19), qrs: U(R, 0.07, 0.1), pk: 'm' }; },
+    'rae': function (R) { return { r: 'sinus', rate: I(R, 64, 95), pr: U(R, 0.13, 0.18), qrs: U(R, 0.07, 0.1), pk: 'pul' }; },
+    'ischaemia': function (R) { return { r: 'sinus', rate: I(R, 64, 95), pr: U(R, 0.14, 0.18), qrs: U(R, 0.07, 0.1), st: -U(R, 0.1, 0.22), tAmp: U(R, -0.12, 0.08), tk: 'n' }; },
+    'digoxin': function (R) { return { r: 'sinus', rate: I(R, 62, 85), pr: U(R, 0.16, 0.19), qrs: U(R, 0.07, 0.1), dig: true, qtx: U(R, 0.84, 0.9) }; },
+    'pacemaker': function (R) { return { r: 'vent', rate: I(R, 60, 80), qrs: U(R, 0.14, 0.16), k: 'p' }; }
+  };
+  E.VARY = VARY;
+  /* steps allowed to differ from the library strip: 2:1 and complete block may be narrow or wide; digoxin variants keep a normal PR */
+  var SIGK = ['rhythm', 'p', 'pr', 'qrs'], LOOSE = { 'avb-21': 'qrs', 'chb': 'qrs', 'digoxin': 'pr' };
+  /* a variant is valid when its reading matches the rhythm's library strip */
+  E.validVariant = function (id, base, strip, seed) {
+    var a = E.derive(base), b = E.derive(strip, seed);
+    for (var i = 0; i < SIGK.length; i++) { var k = SIGK[i]; if (LOOSE[id] === k) continue; if (a[k] !== b[k]) return false; }
+    /* plain sinus-looking strips keep their rate band, so "sinus rhythm" never hides a brady/tachy */
+    if (a.p === 'normal' && a.rhythm === 'reg' && a.rate !== b.rate) return false;
+    if (b.m && b.m.n && E.rateBucket(b.m.n6) !== b.rate) return false;
+    return true;
+  };
+  E.variant = function (item, R) {
+    var f = VARY[item.id];
+    for (var tries = 0; f && tries < 25; tries++) {
+      var s = f(R), seed = 1 + Math.floor(R() * 1e6);
+      if (E.validVariant(item.id, item.strip, s, seed)) return { strip: s, seed: seed };
+    }
+    return { strip: item.strip, seed: SEED0 };
+  };
+
+  var TL = {
+    groups: B('اختر الزمر', 'Choose groups', 'Grupları seçin'), all: B('الكل', 'All', 'Tümü'),
+    q: B('ما هذا النظم؟', 'What is this rhythm?', 'Bu ritim nedir?'),
+    next: B('شريط جديد', 'New strip', 'Yeni şerit'), reading: B('القراءة', 'Reading', 'Okuma'),
+    score: B('صحيح', 'correct', 'doğru'), streak: B('متتالية', 'in a row', 'art arda'), best: B('أفضل سلسلة', 'best streak', 'en iyi seri'),
+    weak: B('تحتاج مراجعة', 'Needs review', 'Tekrar gerekli'), reset: B('تصفير الإحصاءات', 'Reset stats', 'İstatistikleri sıfırla'),
+    resetQ: B('ستُحذف إحصاءات التدريب من هذا الجهاز. متابعة؟', 'This deletes your practice stats on this device. Continue?', 'Bu cihazdaki alıştırma istatistikleriniz silinecek. Devam edilsin mi?'),
+    note: B('كل شريط مولَّد جديد: السرعة والفواصل تتغيّر في كل مرة، والنُّظم التي تخطئ فيها تتكرر أكثر.', 'Every strip is newly generated: rate and intervals change each time, and rhythms you miss come up more often.', 'Her şerit yeni üretilir: hız ve aralıklar her seferinde değişir; yanıldığınız ritimler daha sık gelir.'),
+    cal: B('الفرجار', 'Calipers', 'Pergel'),
+    calHint: B('اسحب الخطّين على الشريط.', 'Drag the two lines on the strip.', 'Şerit üzerindeki iki çizgiyi sürükleyin.'),
+    calRead: B('المسافة {d} ثانية ({s} مربعاً صغيراً) ← 60 ÷ {d} ≈ {r} في الدقيقة', 'Distance {d} s ({s} small squares) → 60 ÷ {d} ≈ {r}/min', 'Mesafe {d} sn ({s} küçük kare) → 60 ÷ {d} ≈ dakikada {r}')
+  };
+  E.TL = TL;
+  var TR_CSS = '' +
+    '.ecg-chips{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 10px}' +
+    '.ecg-chip{min-height:36px;padding:4px 12px;border:1px solid var(--hw-line);border-radius:99px;background:var(--hw-bg);color:var(--hw-ink);font:inherit;font-size:13.5px;font-weight:700;cursor:pointer}' +
+    '.ecg-chip[aria-pressed=true]{background:var(--hw-accent);border-color:var(--hw-accent);color:#fff}' +
+    '.ecg-tbar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:8px 12px;border-top:1px solid var(--hw-line)}' +
+    '.ecg-tbar .hw-btn{min-height:36px;padding:4px 12px;font-size:13.5px}.ecg-tbar .hw-btn[aria-pressed=true]{background:var(--hw-accent-soft);border-color:var(--hw-accent);color:var(--hw-accent-ink)}' +
+    '.ecg-calr{font-size:13.5px;color:var(--hw-accent-ink);font-weight:700}' +
+    '.ecg-cal line{stroke:#0a7a6b;stroke-width:.35;stroke-dasharray:1 .6}.ecg-cal .h{fill:transparent;cursor:ew-resize;touch-action:none}' +
+    '.ecg-cal circle{fill:#0a7a6b}.ecg-cal .band{fill:rgba(12,151,132,.08)}' +
+    '.ecg-weak{margin:10px 0 0;font-size:13.5px;color:var(--hw-muted);line-height:1.8}.ecg-weak a{font-weight:700}';
+
+  /* ---------- calipers on any E.paper strip inside `box`; returns the toolbar element ---------- */
+  function calipers(box) {
+    var bar = d.createElement('div'); bar.className = 'ecg-tbar';
+    bar.innerHTML = '<button type="button" class="hw-btn js-cal" aria-pressed="false">' + H.bi(TL.cal) + '</button><span class="ecg-calr js-calr"></span>';
+    box.appendChild(bar);
+    var btn = bar.querySelector('.js-cal'), out = bar.querySelector('.js-calr'), g = null;
+    function svg() { return box.querySelector('.ecg-paper svg'); }
+    function read(xa, xb) {
+      var dm = Math.abs(xb - xa), s = dm / 25;
+      out.innerHTML = H.bi(s < 0.04 ? TL.calHint : T(TL.calRead, { d: nb(s), s: nb(Math.round(dm * 2) / 2, (Math.round(dm * 2) / 2) % 1 ? 1 : 0), r: Math.round(60 / s) }));
+    }
+    function on() {
+      var sv = svg(); if (!sv) return;
+      var vb = sv.viewBox.baseVal, W = vb.width, Hh = vb.height, NS = 'http://www.w3.org/2000/svg', x = [40, 60];
+      g = d.createElementNS(NS, 'g'); g.setAttribute('class', 'ecg-cal');
+      g.innerHTML = '<rect class="band" y="0" height="' + Hh + '"/>' + [0, 1].map(function (i) {
+        return '<g data-i="' + i + '"><line y1="0" y2="' + Hh + '"/><circle r="1.1" cy="2"/><rect class="h" y="0" width="5" height="' + Hh + '"/></g>'; }).join('');
+      sv.appendChild(g);
+      function place() {
+        g.querySelectorAll('g[data-i]').forEach(function (k) {
+          var xi = x[+k.getAttribute('data-i')];
+          k.querySelector('line').setAttribute('x1', xi); k.querySelector('line').setAttribute('x2', xi);
+          k.querySelector('circle').setAttribute('cx', xi); k.querySelector('.h').setAttribute('x', xi - 2.5);
+        });
+        var band = g.querySelector('.band'); band.setAttribute('x', Math.min(x[0], x[1])); band.setAttribute('width', Math.abs(x[1] - x[0]));
+        read(x[0], x[1]);
+      }
+      g.querySelectorAll('g[data-i]').forEach(function (k) {
+        var i = +k.getAttribute('data-i'), h = k.querySelector('.h');
+        h.addEventListener('pointerdown', function (e) {
+          e.preventDefault(); try { h.setPointerCapture(e.pointerId); } catch (er) {}
+          function mv(ev) {
+            var pt = sv.createSVGPoint(); pt.x = ev.clientX; pt.y = ev.clientY;
+            var p = pt.matrixTransform(sv.getScreenCTM().inverse());
+            x[i] = clamp(Math.round(p.x * 4) / 4, 10, W - 0.5); place();
+          }
+          function up() { h.removeEventListener('pointermove', mv); h.removeEventListener('pointerup', up); h.removeEventListener('pointercancel', up); }
+          h.addEventListener('pointermove', mv); h.addEventListener('pointerup', up); h.addEventListener('pointercancel', up);
+        });
+      });
+      place();
+    }
+    function off() { if (g) g.remove(); g = null; out.innerHTML = ''; }
+    btn.addEventListener('click', function () { var v = btn.getAttribute('aria-pressed') !== 'true'; btn.setAttribute('aria-pressed', String(v)); if (v) on(); else off(); });
+    return bar;
+  }
+  E.calipers = calipers;
+
+  var TRK = 'ecg-train';
+  function trainTab(panel, lib, start) {
+    var items = lib.items, groups = lib.groups, byId = {}; items.forEach(function (x) { byId[x.id] = x; });
+    var st = H.store.get(TRK, null); if (!st || !st.s) st = { g: null, s: {}, best: 0 };
+    var R = rng((Date.now() ^ (Math.random() * 1e9)) >>> 0), sess = { ok: 0, n: 0, streak: 0 }, sel, cur = null;
+    injectCs();
+    panel.classList.add('ecg-cs');
+    function setSel(gs) { sel = {}; (gs && gs.length ? gs : groups.map(function (gg) { return gg.id; })).forEach(function (id) { sel[id] = 1; }); }
+    setSel(start && start.a && groups.some(function (gg) { return gg.id === start.a; }) ? [start.a] : st.g);
+    var api = {
+      hash: function () { var on = Object.keys(sel); return 'train' + (on.length === 1 ? '/' + on[0] : ''); },
+      go: function (gid) { if (gid && groups.some(function (gg) { return gg.id === gid; })) { setSel([gid]); save(); chips(); fresh(); } }
+    };
+    panel.innerHTML = '<div class="ecg-chips js-chips" role="group"></div>' +
+      '<div class="ecg-cs-top js-stats"></div>' +
+      '<section class="ecg-view js-strip"></section>' +
+      '<section class="hw-card ecg-q js-q" aria-live="polite" style="margin-top:12px"></section>' +
+      '<div class="js-weak"></div><p class="ecg-note">' + H.bi(TL.note) + '</p>';
+    function save() { st.g = Object.keys(sel).length === groups.length ? null : Object.keys(sel); H.store.set(TRK, st); }
+    function chips() {
+      var box = panel.querySelector('.js-chips'), allOn = Object.keys(sel).length === groups.length;
+      box.innerHTML = '<button type="button" class="ecg-chip" data-g="*" aria-pressed="' + allOn + '">' + H.bi(TL.all) + '</button>' +
+        groups.map(function (gg) { return '<button type="button" class="ecg-chip" data-g="' + H.esc(gg.id) + '" aria-pressed="' + (!allOn && !!sel[gg.id]) + '">' + H.bi(gg.name) + '</button>'; }).join('');
+    }
+    panel.querySelector('.js-chips').addEventListener('click', function (e) {
+      var b = e.target.closest && e.target.closest('.ecg-chip'); if (!b) return;
+      var gid = b.getAttribute('data-g'), allOn = Object.keys(sel).length === groups.length;
+      if (gid === '*') setSel(null);
+      else if (allOn) setSel([gid]);
+      else { if (sel[gid]) delete sel[gid]; else sel[gid] = 1; if (!Object.keys(sel).length) setSel(null); }
+      save(); chips(); setHash(api.hash()); fresh();
+    });
+    function stats() {
+      panel.querySelector('.js-stats').innerHTML = '<span><b dir="ltr">' + sess.ok + ' / ' + sess.n + '</b> ' + H.bi(TL.score) + '</span>' +
+        '<span><b>' + sess.streak + '</b> ' + H.bi(TL.streak) + '</span><span><b>' + (st.best || 0) + '</b> ' + H.bi(TL.best) + '</span>';
+      var weak = Object.keys(st.s).map(function (id) { var x = st.s[id]; return { id: id, r: x[0] / x[1], n: x[1] }; })
+        .filter(function (x) { return byId[x.id] && x.n >= 2 && x.r < 0.7; }).sort(function (a, b) { return a.r - b.r; }).slice(0, 4);
+      panel.querySelector('.js-weak').innerHTML = weak.length ? '<p class="ecg-weak"><b>' + H.bi(TL.weak) + ':</b> ' + weak.map(function (x) {
+        return '<a href="#library/' + H.esc(x.id) + '">' + H.bi(byId[x.id].short || byId[x.id].name) + '</a> <span dir="ltr">(' + Math.round(x.r * 100) + '%)</span>'; }).join(' · ') + '</p>' : '';
+    }
+    /* adaptive pick: weight 1 + 3 × error rate, and never the same rhythm twice in a row */
+    function pick() {
+      var pool = items.filter(function (x) { return sel[x.group] && VARY[x.id] && (!cur || x.id !== cur.item.id || items.length < 2); });
+      if (!pool.length) pool = items;
+      var w = pool.map(function (x) { var s = st.s[x.id]; return 1 + (s ? 3 * (1 - s[0] / s[1]) : 1); }), sum = w.reduce(function (a, b) { return a + b; }, 0), r = R() * sum;
+      for (var i = 0; i < pool.length; i++) { r -= w[i]; if (r <= 0) return pool[i]; }
+      return pool[pool.length - 1];
+    }
+    /* distractors: same group first, then the selected groups, then any; skip ones that would also be true */
+    function distract(item) {
+      var on = item.group === 'cond' || (item.group === 'special' && item.id !== 'pacemaker');
+      var bad = function (x) { return x.id === item.id || (on && /^sinus-(rhythm|tachy|brady)$/.test(x.id)); };
+      var shuffle = function (a) { for (var i = a.length - 1; i > 0; i--) { var j = Math.floor(R() * (i + 1)), t = a[i]; a[i] = a[j]; a[j] = t; } return a; };
+      var same = shuffle(items.filter(function (x) { return x.group === item.group && !bad(x); })).slice(0, 2);
+      var rest = shuffle(items.filter(function (x) { return x.group !== item.group && !bad(x) && sel[x.group]; }))
+        .concat(shuffle(items.filter(function (x) { return !sel[x.group] && !bad(x); })));
+      return same.concat(rest).slice(0, 3);
+    }
+    function fresh() {
+      var item = pick(), v = E.variant(item, R);
+      cur = { item: item, strip: v.strip, seed: v.seed, done: false };
+      var sb = panel.querySelector('.js-strip');
+      sb.innerHTML = E.paper(v.strip, { seconds: CASE_SEC, seed: v.seed }) + '<p class="ecg-hint">' + H.bi(L.hint) + '</p>';
+      calipers(sb);
+      var opts = distract(item).concat([item]); for (var i = opts.length - 1; i > 0; i--) { var j = Math.floor(R() * (i + 1)), t = opts[i]; opts[i] = opts[j]; opts[j] = t; }
+      var q = panel.querySelector('.js-q');
+      q.innerHTML = '<h3>' + H.bi(TL.q) + '</h3><div class="hw-opts" role="radiogroup">' + opts.map(function (o) {
+        return '<button type="button" class="hw-opt" role="radio" aria-checked="false" data-v="' + H.esc(o.id) + '"><span class="hw-box">' + H.icon('check') + '</span>' +
+          '<span class="hw-opt-b"><span class="hw-opt-t">' + H.bi(o.short || o.name) + '</span><span class="hw-opt-tag"></span></span></button>'; }).join('') +
+        '</div><div class="js-rd"></div><div class="hw-submit"><button type="button" class="hw-btn hw-btn--accent js-next">' + H.bi(TL.next) + '</button></div>';
+      var grp = q.querySelector('.hw-opts');
+      grp.addEventListener('click', function (e) {
+        var b = e.target.closest && e.target.closest('.hw-opt'); if (!b || cur.done) return;
+        cur.done = true; var v2 = b.getAttribute('data-v'), ok = v2 === item.id;
+        grp.classList.add('is-graded');
+        grp.querySelectorAll('.hw-opt').forEach(function (o) {
+          var ov = o.getAttribute('data-v'), tag = o.querySelector('.hw-opt-tag');
+          o.setAttribute('aria-checked', String(ov === v2)); o.setAttribute('aria-disabled', 'true');
+          if (ov === item.id) { o.classList.add('g-ok'); tag.innerHTML = H.bi(ov === v2 ? CL.right : CL.correctIs); }
+          else if (ov === v2) { o.classList.add('g-bad'); o.querySelector('.hw-box').innerHTML = H.icon('x'); tag.innerHTML = H.bi(CL.yours); }
+          else o.classList.add('g-skip');
+        });
+        sess.n++; if (ok) { sess.ok++; sess.streak++; } else sess.streak = 0;
+        st.best = Math.max(st.best || 0, sess.streak);
+        var s = st.s[item.id] || [0, 0]; s[0] += ok ? 1 : 0; s[1]++; st.s[item.id] = s; H.store.set(TRK, st);
+        reading(q.querySelector('.js-rd'), item, cur);
+        stats();
+        q.querySelector('.js-next').focus({ preventScroll: true });
+      });
+      q.querySelector('.js-next').addEventListener('click', function () { fresh(); var r = panel.getBoundingClientRect(); if (r.top < 0) panel.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' }); });
+    }
+    /* the derived reading of this very strip, with its numbers */
+    function reading(box, item, c) {
+      var a = E.derive(c.strip, c.seed), m = a.m;
+      var rows = ['rate', 'rhythm', 'p', 'pr', 'qrs'].filter(function (k) { return a[k] != null; }).map(function (k) {
+        var o = (OPT[k] || []).filter(function (x) { return x[0] === a[k]; })[0], wy = why(k, a, m, item);
+        return '<li><span class="ok">' + H.icon('check') + '</span><b>' + H.bi(L[k]) + '</b><span>' + H.bi(o ? o[1] : a[k]) + (wy ? '<small>' + H.bi(wy) + '</small>' : '') + '</span></li>';
+      }).join('');
+      box.innerHTML = '<h3 style="margin:14px 0 0;font-size:16px">' + H.bi(TL.reading) + '</h3>' + (rows ? '<ul class="ecg-sum">' + rows + '</ul>' : '') +
+        (item.text ? '<p class="ecg-txt">' + H.bi(noHere(item.text)) + '</p>' : '') +
+        '<p class="ecg-txt"><a href="#library/' + H.esc(item.id) + '">' + H.bi(CL.openLib) + '</a></p>';
+    }
+    chips(); stats(); fresh();
+    E.trainState = function () { return { cur: cur && { id: cur.item.id, strip: cur.strip, seed: cur.seed }, sess: sess, sel: Object.keys(sel) }; }; /* test hook */
     return api;
   }
 
