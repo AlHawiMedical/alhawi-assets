@@ -1,4 +1,4 @@
-/*! ECG Academy: strip engine + Library + academy shell (tabs, deep links, related) | v0.3.1 (ar/en/tr) | requires hawi-core.js v0.3 */
+/*! ECG Academy: strip engine + Library + Cases + academy shell (tabs, deep links, related) | v0.4.0 (ar/en/tr) | requires hawi-core.js v0.3 */
 (function (w, d) {
   'use strict';
   var H = w.Hawi; if (!H) return;
@@ -402,7 +402,6 @@
     sub: B('اقرأ الشريط خطوة بخطوة: السرعة والنظم والموجات والفواصل.', 'Read the strip step by step: rate, rhythm, waves and intervals.', 'Şeridi adım adım okuyun: hız, ritim, dalgalar ve aralıklar.'),
     cases: B('الحالات', 'Cases', 'Vakalar'), train: B('التدريب', 'Practice', 'Alıştırma'), lessons: B('الدروس', 'Lessons', 'Dersler'),
     soon: B('قريباً', 'Coming soon', 'Yakında'),
-    casesSoon: B('حالات تفاعلية مرتبة حسب الصعوبة: تقرأ الشريط خطوة بخطوة وتحصل على درجة وشرح.', 'Interactive cases by difficulty: read the strip step by step and get a score and explanation.', 'Zorluğa göre etkileşimli vakalar: şeridi adım adım okuyun, puan ve açıklama alın.'),
     trainSoon: B('شرائط عشوائية بلا نهاية من الزمر التي تختارها، مع فرجار رقمي للقياس.', 'Endless random strips from the groups you choose, with digital calipers.', 'Seçtiğiniz gruplardan sınırsız rastgele şeritler ve dijital pergel.'),
     lessonsSoon: B('دروس التخطيط تُنشر قريباً، وتظهر هنا تلقائياً.', 'ECG lessons are coming soon and will appear here automatically.', 'EKG dersleri yakında yayınlanacak ve burada otomatik olarak görünecek.'),
     loading: B('جارٍ التحميل…', 'Loading…', 'Yükleniyor…'),
@@ -463,7 +462,7 @@
 
   /* =====================================================================
      5. ACADEMY SHELL — tabs (library · cases · practice · lessons) + deep links
-        #library/<id> · #cases · #train · #lessons
+        #library/<id> · #cases[/<set>[/<n>]] · #train · #lessons
      ===================================================================== */
   function route() {
     var h = decodeURIComponent((location.hash || '').slice(1)).split('/');
@@ -484,13 +483,13 @@
     /* the page's own title (Blogger h1) already names the academy: show ours only when there is none */
     var own = d.querySelector('h1');
     mount.innerHTML = '<header class="ecg-head">' + (own ? '' : '<h2>' + H.bi(L.title) + '</h2>') + '<p>' + H.bi(L.sub) + '</p></header><div class="js-top"></div>';
-    var r = route(), lib = null;
+    var r = route(), lib = null, cs = null;
     var top = H.tabs(mount.querySelector('.js-top'), { variant: 'line', tabs: [
-      { id: 'library', label: L.lib, render: function (p) { lib = library(p, data, r.tab === 'library' ? r.a : null); } },
-      { id: 'cases', label: L.cases, html: soon(L.casesSoon) },
+      { id: 'library', label: L.lib, render: function (p) { var x = route(); lib = library(p, data, x.tab === 'library' ? x.a : null); } },
+      { id: 'cases', label: L.cases, render: function (p) { var x = route(); cs = casesTab(p, data, x.tab === 'cases' ? x : null); } },
       { id: 'train', label: L.train, html: soon(L.trainSoon) },
       { id: 'lessons', label: L.lessons, render: lessons }
-    ], onChange: function (id) { if (ready) setHash(id === 'library' && lib ? 'library/' + lib.cur() : id); } });
+    ], onChange: function (id) { if (ready) setHash(id === 'library' && lib ? 'library/' + lib.cur() : id === 'cases' && cs ? cs.hash() : id); } });
     var ready = false;
     top.select(r.tab || 'library', { silent: true });
     ready = true;
@@ -498,6 +497,7 @@
       var x = route(); if (!x.tab) return;
       top.select(x.tab);
       if (x.tab === 'library' && x.a && lib) lib.go(x.a, true);
+      if (x.tab === 'cases' && cs) cs.go(x.a, x.b);
     });
   }
 
@@ -627,6 +627,388 @@
         select(it, scroll);
       }
     };
+  }
+
+  /* =====================================================================
+     6. CASES — systematic reading: rate → rhythm → P → PR → QRS → diagnosis.
+        The answers come from the strip itself (E.measure / E.derive), so a case
+        can never contradict the trace it shows. Data: hawi-ecg-cases.js (HW1).
+        Deep links: #cases · #cases/<set> · #cases/<set>/<n>
+     ===================================================================== */
+  var CASE_SEC = 10, SEED0 = 20261122;
+  /* everything a reader can measure on the strip E.paper draws (t from 0.4 s, `sec` long) */
+  E.measure = function (spec, seed, sec) {
+    sec = sec || CASE_SEC;
+    var s = new Stream(spec, seed || SEED0), t0 = 0.4, t1 = 0.4 + sec, P = [], Q = [], h = 0, c, i;
+    while (h < t1 + 1) { c = s.next(); for (i = 0; i < c.P.length; i++) P.push(c.P[i]); for (i = 0; i < c.Q.length; i++) Q.push(c.Q[i]); h = c.until; }
+    /* a beat counts when its R peak is on the paper; a P when its peak is */
+    Q = Q.filter(function (e) { var pk = e.t + 0.45 * e.d; return pk >= t0 && pk <= t1; });
+    P = P.filter(function (e) { var pk = e.t + 0.05; return pk >= t0 && pk <= t1; });
+    var rr = [], prs = [];
+    for (i = 1; i < Q.length; i++) rr.push(Q[i].t - Q[i - 1].t);
+    Q.forEach(function (q) { if (q.p != null) prs.push(q.t - q.p); });
+    var mean = rr.length ? rr.reduce(function (a, b) { return a + b; }, 0) / rr.length : 0;
+    function mn(a) { return a.length ? Math.min.apply(null, a) : 0; }
+    function mx(a) { return a.length ? Math.max.apply(null, a) : 0; }
+    return {
+      sec: sec, n: Q.length, nP: P.length, n6: Math.round(Q.length * 60 / sec),
+      rate: mean ? Math.round(60 / mean) : 0, rr: mean, rrMin: mn(rr), rrMax: mx(rr),
+      prMin: mn(prs), prMax: mx(prs), prN: prs.length, qrs: spec.qrs || 0
+    };
+  };
+  function rateBucket(r) { return r < 60 ? 'lt60' : r <= 100 ? '60-100' : r <= 150 ? '101-150' : 'gt150'; }
+  E.rateBucket = rateBucket;
+  /* the expected answer for each reading step (null = step does not apply to this strip) */
+  E.derive = function (spec, seed, sec) {
+    var m = E.measure(spec, seed, sec), r = spec.r, a = {};
+    if (r === 'cont') return { rate: null, rhythm: null, p: 'none', pr: 'na', qrs: null, m: m };
+    a.rate = rateBucket(m.rate);
+    a.rhythm = (r === 'af' || r === 'mat') ? 'irr-irr' : (m.rrMax - m.rrMin < 0.12 ? 'reg' : 'reg-irr');
+    if (spec.noP || r === 'af' || r === 'vent') a.p = 'none';
+    else if (r === 'flut') a.p = 'flutter';
+    else if (r === 'avb2' || r === 'chb') a.p = 'more';
+    else if (spec.pk === 'inv' || (r === 'esc' && spec.type === 'j') || (r === 'pac' && spec.type === 'j')) a.p = 'inv';
+    else if (r === 'mat' || r === 'pac' || (spec.pk && spec.pk !== 'n') || (r === 'esc' && spec.type === 'a')) a.p = 'abn';
+    else a.p = 'normal';
+    if (r === 'chb') a.pr = 'var';
+    else if (r === 'avb2' && spec.mode === 'w') a.pr = 'prog';
+    else if (!m.prN || a.p === 'none' || a.p === 'flutter') a.pr = 'na';
+    else if (m.prMax - m.prMin > 0.03) a.pr = 'var';
+    else if (m.prMax < 0.12) a.pr = 'short';
+    else if (m.prMin > 0.2005) a.pr = 'long';
+    else a.pr = 'normal';
+    a.qrs = (spec.qrs || 0) >= 0.12 ? 'wide' : 'narrow';
+    a.m = m;
+    return a;
+  };
+
+  var OPT = {
+    rate: [['lt60', B('أقل من 60', 'Under 60', '60\'ın altında')], ['60-100', '60–100'], ['101-150', '101–150'], ['gt150', B('أكثر من 150', 'Over 150', '150\'nin üzerinde')]],
+    rhythm: [['reg', B('منتظم', 'Regular', 'Düzenli')],
+      ['reg-irr', B('غير منتظم بنمط (يتكرّر أو يتدرّج)', 'Irregular with a pattern (repeating or gradual)', 'Belirli bir düzende düzensiz (tekrarlayan veya kademeli)')],
+      ['irr-irr', B('غير منتظم بلا أي نمط', 'Irregularly irregular', 'Düzensiz olarak düzensiz')]],
+    p: [['normal', B('طبيعية: موجبة ومتماثلة، واحدة قبل كل QRS', 'Normal: upright and uniform, one before each QRS', 'Normal: pozitif ve aynı şekilli, her QRS öncesi bir tane')],
+      ['abn', B('بشكل غير طبيعي أو متغيّر', 'Abnormal or changing shape', 'Anormal veya değişken şekilli')],
+      ['inv', B('مقلوبة (راجعة)', 'Inverted (retrograde)', 'Negatif (retrograd)')],
+      ['more', B('موجات P أكثر من مركّبات QRS', 'More P waves than QRS complexes', 'P dalgaları QRS\'lerden fazla')],
+      ['flutter', B('موجات F بشكل أسنان المنشار', 'Sawtooth F waves', 'Testere dişi F dalgaları')],
+      ['none', B('غائبة (أو موجات رجفانية)', 'Absent (or fibrillatory waves)', 'Yok (veya fibrilasyon dalgaları)')]],
+    pr: [['normal', B('طبيعي 0.12–0.20 ثانية وثابت', 'Normal, 0.12–0.20 s and constant', 'Normal, 0,12–0,20 sn ve sabit')],
+      ['short', B('قصير (أقل من 0.12 ثانية)', 'Short (< 0.12 s)', 'Kısa (< 0,12 sn)')],
+      ['long', B('طويل (أكثر من 0.20 ثانية) وثابت', 'Long (> 0.20 s) and constant', 'Uzun (> 0,20 sn) ve sabit')],
+      ['prog', B('يطول تدريجياً ثم تُحجب P', 'Lengthens progressively until a P is blocked', 'Bir P bloke olana dek giderek uzar')],
+      ['var', B('متغيّر بلا علاقة ثابتة', 'Varies with no fixed relationship', 'Sabit ilişki olmadan değişken')],
+      ['na', B('غير قابل للقياس', 'Not measurable', 'Ölçülemez')]],
+    qrs: [['narrow', B('ضيّق (أقل من 0.12 ثانية)', 'Narrow (< 0.12 s)', 'Dar (< 0,12 sn)')], ['wide', B('عريض (0.12 ثانية أو أكثر)', 'Wide (≥ 0.12 s)', 'Geniş (≥ 0,12 sn)')]]
+  };
+  var STEPS = ['rate', 'rhythm', 'p', 'pr', 'qrs', 'dx'];
+  var PTS = { rate: 1, rhythm: 1, p: 1, pr: 1, qrs: 1, dx: 2 };
+  var CL = {
+    dx: B('التفسير', 'Interpretation', 'Yorum'),
+    q: {
+      rate: B('كم سرعة البطينين في الدقيقة؟', 'What is the ventricular rate per minute?', 'Dakikadaki ventrikül hızı nedir?'),
+      rhythm: B('هل النظم منتظم؟', 'Is the rhythm regular?', 'Ritim düzenli mi?'),
+      p: B('كيف تبدو موجات P؟', 'What do the P waves look like?', 'P dalgaları nasıl görünüyor?'),
+      pr: B('كم فاصل PR؟', 'What is the PR interval?', 'PR aralığı nedir?'),
+      qrs: B('كم عرض مركّب QRS؟', 'How wide is the QRS complex?', 'QRS kompleksi ne genişlikte?'),
+      dx: B('ما تفسير هذا الشريط؟', 'What is your interpretation of this strip?', 'Bu şeridi nasıl yorumlarsınız?')
+    },
+    tip: {
+      rate: B('عُدّ مركّبات QRS في الشريط (10 ثوانٍ) واضربها × 6، أو اقسم 300 على عدد المربعات الكبيرة بين R وR.', 'Count the QRS complexes on this 10-s strip and multiply by 6, or divide 300 by the number of large squares between two R waves.', 'Bu 10 saniyelik şeritteki QRS\'leri sayıp 6 ile çarpın veya 300\'ü iki R arasındaki büyük kare sayısına bölün.'),
+      rhythm: B('قارن مسافات R–R: فرق أكبر من 0.12 ثانية (3 مربعات صغيرة) يعني عدم انتظام.', 'Compare the R–R intervals: a difference over 0.12 s (3 small squares) means irregular.', 'R–R aralıklarını karşılaştırın: 0,12 sn\'den (3 küçük kare) fazla fark düzensizlik demektir.'),
+      p: B('ابحث عن P قبل كل QRS: هل هي موجبة في II ومتماثلة؟ وهل عددها يساوي عدد QRS؟', 'Look for a P before every QRS: upright in II and uniform? As many P waves as QRS complexes?', 'Her QRS\'ten önce P arayın: DII\'de pozitif ve aynı şekilli mi? Sayısı QRS sayısına eşit mi?'),
+      pr: B('من بداية P إلى بداية QRS. المربع الصغير 0.04 ثانية، والطبيعي 3–5 مربعات صغيرة.', 'From the start of P to the start of QRS. A small square is 0.04 s; normal is 3–5 small squares.', 'P başlangıcından QRS başlangıcına. Küçük kare 0,04 sn; normali 3–5 küçük karedir.'),
+      qrs: B('من بداية Q إلى نهاية S. ثلاثة مربعات صغيرة = 0.12 ثانية.', 'From the start of Q to the end of S. Three small squares = 0.12 s.', 'Q başlangıcından S sonuna. Üç küçük kare = 0,12 sn.'),
+      dx: B('اجمع ما وجدته في الخطوات الخمس.', 'Put together what you found in the five steps.', 'Beş adımda bulduklarınızı birleştirin.')
+    },
+    sets: B('مجموعات الحالات', 'Case sets', 'Vaka setleri'),
+    caseN: B('الحالة', 'Case', 'Vaka'), setN: B('المجموعة', 'Set', 'Set'),
+    lv: [null, B('سهلة', 'Easy', 'Kolay'), B('متوسطة', 'Medium', 'Orta'), B('صعبة', 'Hard', 'Zor')],
+    step: B('الخطوة', 'Step', 'Adım'), of: B('من', 'of', '/'),
+    next: B('التالي', 'Next', 'İleri'), finish: B('النتيجة', 'See result', 'Sonucu gör'),
+    back: B('رجوع', 'Back', 'Geri'), retry: B('أعد الحالة', 'Retry case', 'Vakayı tekrarla'), nextCase: B('الحالة التالية', 'Next case', 'Sonraki vaka'),
+    right: B('صحيح', 'Correct', 'Doğru'), yours: B('إجابتك', 'Your answer', 'Cevabınız'), correctIs: B('الصحيح', 'Correct', 'Doğrusu'),
+    result: B('النتيجة', 'Result', 'Sonuç'), expl: B('الشرح', 'Explanation', 'Açıklama'),
+    openLib: B('افتح هذا النظم في المكتبة', 'Open this rhythm in the Library', 'Bu ritmi kütüphanede aç'),
+    solved: B('حالة محلولة', 'cases solved', 'çözülen vaka'), avg: B('متوسط أفضل درجة', 'average best score', 'ortalama en iyi puan'),
+    best: B('الأفضل', 'Best', 'En iyi'),
+    mist: B('سجلّ الأخطاء', 'Mistakes log', 'Hata kaydı'), noMist: B('لا أخطاء مسجّلة بعد.', 'No mistakes recorded yet.', 'Henüz kayıtlı hata yok.'),
+    open: B('افتح', 'Open', 'Aç'),
+    clear: B('مسح السجل', 'Clear log', 'Kaydı temizle'),
+    clearQ: B('سيُحذف سجل حالات التخطيط ودرجاتها من هذا الجهاز. متابعة؟', 'This deletes your ECG case log and scores on this device. Continue?', 'Bu cihazdaki EKG vaka kaydınız ve puanlarınız silinecek. Devam edilsin mi?'),
+    cancel: B('إلغاء', 'Cancel', 'İptal'), del: B('حذف', 'Delete', 'Sil'),
+    unavailable: B('تعذّر تحميل الحالات. حدّث الصفحة.', 'Could not load the cases. Refresh the page.', 'Vakalar yüklenemedi. Sayfayı yenileyin.'),
+    local: B('تُحفظ درجاتك وأخطاؤك على هذا الجهاز فقط.', 'Your scores and mistakes are kept on this device only.', 'Puanlarınız ve hatalarınız yalnızca bu cihazda saklanır.')
+  };
+  E.CL = CL; E.OPT = OPT;
+
+  /* numbers in all three languages (Turkish uses a decimal comma) */
+  function nb(x, dp) { var s = (+x).toFixed(dp == null ? 2 : dp); return { ar: s, en: s, tr: s.replace('.', ',') }; }
+  function T(tpl, vals) { /* tpl: {ar,en,tr} with {k} slots; vals: k -> string | nb() */
+    var o = {};
+    ['ar', 'en', 'tr'].forEach(function (l) {
+      o[l] = tpl[l].replace(/\{(\w+)\}/g, function (_, k) { var v = vals[k]; return v == null ? '' : (typeof v === 'object' ? (v[l] != null ? v[l] : v.en) : String(v)); });
+    });
+    return o;
+  }
+  function sq(sec) { var v = Math.round(sec / 0.04 * 2) / 2; return nb(v, v % 1 ? 1 : 0); }
+  /* why the correct option is correct, with the numbers of this very strip */
+  function why(step, ans, m, item) {
+    var v = ans[step];
+    if (step === 'rate') return T(B('في هذا الشريط (10 ثوانٍ) {n} مركّبات QRS، أي نحو {n6} في الدقيقة؛ ومتوسط R–R {rr} ثانية ← 60 ÷ {rr} ≈ {r}.',
+      'This 10-s strip shows {n} QRS complexes, about {n6}/min; the mean R–R is {rr} s → 60 ÷ {rr} ≈ {r}.',
+      'Bu 10 saniyelik şeritte {n} QRS var, yani dakikada yaklaşık {n6}; ortalama R–R {rr} sn → 60 ÷ {rr} ≈ {r}.'), { n: m.n, n6: m.n6, rr: nb(m.rr), r: m.rate });
+    if (step === 'rhythm') {
+      if (v === 'reg') return m.rrMax - m.rrMin < 0.005 ? T(B('كل مسافات R–R متساوية ({a} ثانية).', 'Every R–R interval is the same ({a} s).', 'Tüm R–R aralıkları aynı ({a} sn).'), { a: nb(m.rr) }) :
+        T(B('مسافات R–R متساوية تقريباً ({a}–{b} ثانية).', 'The R–R intervals are essentially equal ({a}–{b} s).', 'R–R aralıkları neredeyse eşit ({a}–{b} sn).'), { a: nb(m.rrMin), b: nb(m.rrMax) });
+      if (v === 'reg-irr') return T(B('تتراوح R–R بين {a} و{b} ثانية (فرق {d}، أكبر من 0.12)، وتتغيّر بتدرّج أو بنمط متكرر لا عشوائياً.', 'R–R ranges from {a} to {b} s (a {d} s difference, over 0.12), changing gradually or in a repeating pattern rather than at random.', 'R–R {a} ile {b} sn arasında değişir ({d} sn fark, 0,12\'den fazla); rastgele değil, kademeli veya tekrarlayan bir düzende.'), { a: nb(m.rrMin), b: nb(m.rrMax), d: nb(m.rrMax - m.rrMin) });
+      return T(B('تتراوح R–R بين {a} و{b} ثانية دون أي نمط.', 'R–R ranges from {a} to {b} s with no pattern at all.', 'R–R hiçbir düzen olmadan {a} ile {b} sn arasında değişir.'), { a: nb(m.rrMin), b: nb(m.rrMax) });
+    }
+    if (step === 'p') {
+      if (v === 'normal') return B('قبل كل QRS موجة P واحدة موجبة في II، وكلها بالشكل نفسه، ولا موجات P زائدة.', 'Every QRS has one P wave before it, upright in II and identical in shape, with no extra P waves.', 'Her QRS\'ten önce DII\'de pozitif, aynı şekilli tek bir P var; fazladan P dalgası yok.');
+      if (v === 'more') return T(B('{n} موجة P مقابل {q} مركّباً فقط.', '{n} P waves against only {q} QRS complexes.', 'Yalnızca {q} QRS\'e karşı {n} P dalgası.'), { n: m.nP, q: m.n });
+      return null;
+    }
+    if (step === 'pr') {
+      if (v === 'na' || !m.prN) return null;
+      if (m.prMax - m.prMin > 0.005) return T(B('يتراوح PR بين {a} و{b} ثانية.', 'PR ranges from {a} to {b} s.', 'PR {a} ile {b} sn arasında.'), { a: nb(m.prMin), b: nb(m.prMax) });
+      return T(B('PR = {a} ثانية ({s} مربعات صغيرة)، وهو ثابت في كل الضربات.', 'PR = {a} s ({s} small squares), the same in every beat.', 'PR = {a} sn ({s} küçük kare), her atımda aynı.'), { a: nb(m.prMin), s: sq(m.prMin) });
+    }
+    if (step === 'qrs') return T(B('QRS = {a} ثانية ({s} مربعات صغيرة).', 'QRS = {a} s ({s} small squares).', 'QRS = {a} sn ({s} küçük kare).'), { a: nb(m.qrs), s: sq(m.qrs) });
+    if (step === 'dx' && item) return item.short || item.name;
+    return null;
+  }
+
+  /* library facts quote the library strip ("(75 here)"); a case has its own strip, so drop those notes */
+  var HERE = /\s*\([^()]*(هنا|\bhere\b|\bburada\b)[^()]*\)/gi;
+  function noHere(v) { if (v == null || typeof v !== 'object') return typeof v === 'string' ? v.replace(HERE, '') : v; var o = {}; Object.keys(v).forEach(function (k) { o[k] = String(v[k]).replace(HERE, ''); }); return o; }
+  E.noHere = noHere;
+  function hashFor(st) { return 'cases' + (st.set ? '/' + st.set + (st.n ? '/' + st.n : '') : ''); }
+  function seeded(str) { var h = 2166136261; for (var i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); } return rng(h >>> 0); }
+
+  var CS_CSS = '' +
+    '.ecg-cs .ecg-paper svg{min-width:1000px}' +
+    '.ecg-cs-top{display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center;margin:0 0 12px;font-size:14px;color:var(--hw-muted)}' +
+    '.ecg-cs-top b{color:var(--hw-ink);font-size:16px}' +
+    '.ecg-sets,.ecg-cgrid{list-style:none;margin:0 0 14px;padding:0;display:grid;gap:8px}' +
+    '.ecg-cgrid{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}' +
+    '.ecg-set,.ecg-cbtn{display:flex;align-items:center;gap:10px;width:100%;min-height:52px;padding:10px 14px;border:1px solid var(--hw-line);border-radius:12px;background:var(--hw-bg);color:var(--hw-ink);font:inherit;font-size:15px;font-weight:600;text-align:start;cursor:pointer}' +
+    '.ecg-set:hover,.ecg-cbtn:hover{border-color:var(--hw-accent)}' +
+    '.ecg-set[disabled]{cursor:default;opacity:.55}.ecg-set[disabled]:hover{border-color:var(--hw-line)}' +
+    '.ecg-set .ecg-num{display:inline-grid;place-items:center;width:28px;height:28px;border-radius:50%;background:var(--hw-accent-soft);color:var(--hw-accent-ink);font-size:13px;font-weight:800;flex-shrink:0}' +
+    '.ecg-set .ecg-c{margin-inline-start:auto;font-size:12.5px;font-weight:700;color:var(--hw-muted);white-space:nowrap}' +
+    '.ecg-cbtn{flex-direction:column;align-items:flex-start;gap:4px}' +
+    '.ecg-cbtn .hw-lvl{margin:0}.ecg-cbtn small{font-size:12.5px;color:var(--hw-muted);font-weight:700}' +
+    '.ecg-cbtn.is-done{border-color:var(--hw-ok)}' +
+    '.ecg-back{margin:0 0 12px;min-height:40px;padding:6px 14px;font-size:14px}' +
+    '.ecg-ch{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:0 0 8px;font-size:16px}' +
+    '.ecg-story{margin:0 0 12px;padding:12px 14px;border-radius:12px;background:var(--hw-bg-soft);line-height:1.8;font-size:15px}' +
+    '.ecg-dots{display:flex;gap:6px;margin:12px 0 10px}' +
+    '.ecg-dots i{flex:1;height:6px;border-radius:99px;background:var(--hw-line)}' +
+    '.ecg-dots i.ok{background:var(--hw-ok)}.ecg-dots i.bad{background:var(--hw-bad)}.ecg-dots i.cur{background:var(--hw-accent)}' +
+    '.ecg-q h3{margin:0 0 4px;font-size:17px}.ecg-q .ecg-stepn{font-size:12.5px;font-weight:800;color:var(--hw-accent-ink)}' +
+    '.ecg-tip{margin:0 0 10px;font-size:13.5px;color:var(--hw-muted);line-height:1.7}' +
+    '.ecg-q .hw-submit{margin-top:12px}' +
+    '.ecg-sum{list-style:none;margin:10px 0;padding:0;border:1px solid var(--hw-line);border-radius:12px;overflow:hidden}' +
+    '.ecg-sum li{display:grid;grid-template-columns:24px minmax(80px,30%) 1fr;gap:8px;align-items:start;padding:9px 12px;border-bottom:1px solid var(--hw-line);font-size:14px;line-height:1.6}' +
+    '.ecg-sum li:last-child{border-bottom:0}.ecg-sum svg{width:18px;height:18px}' +
+    '.ecg-sum .ok{color:var(--hw-ok)}.ecg-sum .bad{color:var(--hw-bad)}.ecg-sum b{font-weight:700}' +
+    '.ecg-sum small{display:block;color:var(--hw-muted)}' +
+    '.ecg-acts{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}.ecg-acts .hw-btn{flex:1 1 160px}' +
+    '.ecg-mist{list-style:none;margin:0;padding:0}.ecg-mist li{padding:9px 0;border-bottom:1px solid var(--hw-line);font-size:14px;line-height:1.7}' +
+    '.ecg-mist li:last-child{border-bottom:0}.ecg-mist button{margin-inline-start:6px;padding:2px 10px;min-height:30px;font-size:13px}' +
+    '.ecg-note{margin:10px 0 0;font-size:12.5px;color:var(--hw-muted)}';
+
+  /* cases data: window.HawiEcgCases (HW1) from hawi-ecg-cases.js next to this script */
+  function withCases(cb) {
+    if (E.cases) { cb(E.cases); return; }
+    var done = function () { try { E.cases = H.decode(w.HawiEcgCases || ''); } catch (e) { E.cases = null; } cb(E.cases); };
+    if (w.HawiEcgCases) { done(); return; }
+    var s = d.createElement('script'); s.src = BASE + 'hawi-ecg-cases.js' + VQ; s.onload = done; s.onerror = function () { cb(null); };
+    d.body.appendChild(s);
+  }
+
+  var LOGK = 'ecg-cases';
+  function getLog() { var x = H.store.get(LOGK, null); return x && x.r ? x : { r: {}, m: [] }; }
+
+  /* cases panel; returns { go(set, n), hash() } */
+  function casesTab(panel, lib, start) {
+    var byId = {}; lib.items.forEach(function (x) { byId[x.id] = x; });
+    var api = { st: { set: null, n: null }, data: null, pend: start || {} };
+    api.hash = function () { return hashFor(api.st); };
+    api.go = function (set, n) { api.pend = { a: set, b: n }; if (api.data) open(); };
+    panel.classList.add('ecg-cs');
+    panel.innerHTML = '<p class="ecg-hint">' + H.bi(L.loading) + '</p>';
+    if (!d.getElementById('hawi-ecg-cs-css')) { var st = d.createElement('style'); st.id = 'hawi-ecg-cs-css'; st.textContent = CS_CSS; d.head.appendChild(st); }
+    withCases(function (x) {
+      if (!x || !x.cases) { panel.innerHTML = '<p class="ecg-hint">' + H.bi(CL.unavailable) + '</p>'; return; }
+      api.data = x; open();
+    });
+
+    function setOf(id) { return api.data.sets.filter(function (s) { return String(s.id) === String(id); })[0]; }
+    function casesOf(id) { return api.data.cases.filter(function (c) { return String(c.set) === String(id); }).sort(function (a, b) { return a.n - b.n; }); }
+    function open() {
+      var p = api.pend || {}; api.pend = null;
+      var s = p.a && setOf(p.a), list = s ? casesOf(s.id) : [], c = s && p.b ? list.filter(function (k) { return String(k.n) === String(p.b); })[0] : null;
+      if (c) playCase(c); else if (s && list.length) showSet(s); else showList();
+    }
+    function nav(st) { api.st = st; setHash(hashFor(st)); }
+    function top() { var r = panel.getBoundingClientRect(); if (r.top < 0) panel.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' }); }
+    function ring(score, sm) {
+      var c = score >= 75 ? 'var(--hw-ok)' : score >= 40 ? 'var(--hw-warn)' : 'var(--hw-bad)';
+      return '<div class="hw-ring' + (sm ? ' hw-ring--sm' : '') + '" style="--p:' + score + ';--c:' + c + '"><span>' + score + '</span></div>';
+    }
+    function lvl(c) { return c.level ? '<span class="hw-lvl lv-' + c.level + '">' + H.bi(CL.lv[c.level]) + '</span>' : ''; }
+    function optLabel(step, v) {
+      if (step === 'dx') { var it = byId[v]; return it ? (it.short || it.name) : v; }
+      var o = (OPT[step] || []).filter(function (x) { return x[0] === v; })[0]; return o ? o[1] : v;
+    }
+    function caseName(c) { return T(B('{s} {a} · {c} {b}', '{s} {a} · {c} {b}', '{s} {a} · {c} {b}'), { s: CL.setN, a: c.set, c: CL.caseN, b: c.n }); }
+
+    /* ---------- list of sets + mistakes log ---------- */
+    function showList() {
+      nav({ set: null, n: null });
+      var log = getLog(), ids = Object.keys(log.r), all = api.data.cases.length, sum = 0;
+      ids.forEach(function (k) { sum += log.r[k].best || 0; });
+      panel.innerHTML =
+        '<div class="ecg-cs-top"><span><b>' + ids.length + '</b> / ' + all + ' ' + H.bi(CL.solved) + '</span>' +
+        (ids.length ? '<span><b>' + Math.round(sum / ids.length) + '%</b> ' + H.bi(CL.avg) + '</span>' : '') + '</div>' +
+        '<ul class="ecg-sets">' + api.data.sets.map(function (s) {
+          var list = casesOf(s.id), done = list.filter(function (c) { return log.r[c.id]; }).length;
+          return '<li><button type="button" class="ecg-set" data-set="' + H.esc(s.id) + '"' + (list.length ? '' : ' disabled') + '>' +
+            '<span class="ecg-num">' + H.esc(s.id) + '</span><span>' + H.bi(s.name) + '</span>' +
+            '<span class="ecg-c">' + (list.length ? done + ' / ' + list.length : H.bi(L.soon)) + '</span></button></li>';
+        }).join('') + '</ul><div class="js-mist"></div><p class="ecg-note">' + H.bi(CL.local) + '</p>';
+      panel.querySelectorAll('.ecg-set[data-set]').forEach(function (b) {
+        b.addEventListener('click', function () { var s = setOf(b.getAttribute('data-set')); if (s) { showSet(s); top(); } });
+      });
+      mistakes(panel.querySelector('.js-mist'), log);
+    }
+    function mistakes(box, log) {
+      var acc = H.accordion(box, [{ id: 'm', title: CL.mist, render: function (body) {
+        if (!log.m.length) { body.innerHTML = '<p class="ecg-hint" style="border:0;padding:0">' + H.bi(CL.noMist) + '</p>'; return; }
+        body.innerHTML = '<ul class="ecg-mist">' + log.m.map(function (x, i) {
+          var c = api.data.cases.filter(function (k) { return k.id === x.c; })[0]; if (!c) return '';
+          return '<li><b>' + H.bi(caseName(c)) + '</b> — ' + H.bi(T(B('{s}: اخترت «{g}»، والصحيح «{a}»', '{s}: you chose “{g}”; correct: “{a}”', '{s}: seçiminiz “{g}”; doğrusu “{a}”'),
+            { s: x.s === 'dx' ? CL.dx : L[x.s], g: optLabel(x.s, x.g), a: optLabel(x.s, x.a) })) +
+            '<button type="button" class="hw-btn" data-i="' + i + '">' + H.bi(CL.open) + '</button></li>';
+        }).join('') + '</ul><div class="ecg-acts"><button type="button" class="hw-btn js-clr">' + H.icon('x') + H.bi(CL.clear) + '</button></div>';
+        body.querySelectorAll('button[data-i]').forEach(function (b) {
+          b.addEventListener('click', function () { var x = log.m[+b.getAttribute('data-i')], c = x && api.data.cases.filter(function (k) { return k.id === x.c; })[0]; if (c) { playCase(c); top(); } });
+        });
+        body.querySelector('.js-clr').addEventListener('click', function () {
+          H.modal({ icon: 'alert', title: CL.clear, body: '<p>' + H.bi(CL.clearQ) + '</p>', actions: [
+            { label: CL.cancel },
+            { label: CL.del, kind: 'danger', onClick: function (close) { H.store.del(LOGK); close(); showList(); } }] });
+        });
+      } }], { soft: true });
+      acc.m.count(log.m.length ? '<span class="hw-lvl lv-3">' + log.m.length + '</span>' : '');
+    }
+
+    /* ---------- one set: its cases ---------- */
+    function showSet(s) {
+      nav({ set: s.id, n: null });
+      var log = getLog();
+      panel.innerHTML = '<button type="button" class="hw-btn ecg-back js-back">' + H.bi(CL.back) + '</button>' +
+        '<div class="ecg-ch"><b>' + H.bi(CL.setN) + ' ' + H.esc(s.id) + ' — ' + H.bi(s.name) + '</b></div>' +
+        '<ul class="ecg-cgrid">' + casesOf(s.id).map(function (c) {
+          var r = log.r[c.id];
+          return '<li><button type="button" class="ecg-cbtn' + (r ? ' is-done' : '') + '" data-id="' + H.esc(c.id) + '"><span>' + H.bi(CL.caseN) + ' ' + c.n + '</span>' + lvl(c) +
+            '<small>' + (r ? H.bi(CL.best) + ': ' + r.best + '%' : '&nbsp;') + '</small></button></li>';
+        }).join('') + '</ul>';
+      panel.querySelector('.js-back').addEventListener('click', function () { showList(); top(); });
+      panel.querySelectorAll('.ecg-cbtn').forEach(function (b) {
+        b.addEventListener('click', function () { var c = api.data.cases.filter(function (k) { return k.id === b.getAttribute('data-id'); })[0]; if (c) { playCase(c); top(); } });
+      });
+    }
+
+    /* ---------- one case: six steps, then the result ---------- */
+    function playCase(c) {
+      nav({ set: c.set, n: c.n });
+      var seed = c.seed || SEED0, m = E.measure(c.strip, seed, CASE_SEC), ans = c.ans || E.derive(c.strip, seed, CASE_SEC);
+      var item = byId[ans.dx];
+      var steps = STEPS.filter(function (k) { return ans[k] != null; }), i = 0, got = {};
+      /* diagnosis options: the answer + distractors, in a stable per-case order */
+      var R = seeded(c.id), dx = [ans.dx].concat((c.distract || []).filter(function (x) { return byId[x] && x !== ans.dx; }));
+      for (var k = dx.length - 1; k > 0; k--) { var j = Math.floor(R() * (k + 1)), tmp = dx[k]; dx[k] = dx[j]; dx[j] = tmp; }
+      panel.innerHTML = '<button type="button" class="hw-btn ecg-back js-back">' + H.bi(CL.back) + '</button>' +
+        '<div class="ecg-ch"><b>' + H.bi(caseName(c)) + '</b>' + lvl(c) + '</div>' +
+        (c.story ? '<p class="ecg-story">' + H.bi(c.story) + '</p>' : '') +
+        '<section class="ecg-view">' + E.paper(c.strip, { seconds: CASE_SEC, seed: seed }) + '<p class="ecg-hint">' + H.bi(L.hint) + '</p></section>' +
+        '<div class="ecg-dots" aria-hidden="true">' + steps.map(function () { return '<i></i>'; }).join('') + '</div>' +
+        '<section class="hw-card ecg-q js-q" aria-live="polite"></section>';
+      panel.querySelector('.js-back').addEventListener('click', function () { var s = setOf(c.set); if (s) showSet(s); else showList(); top(); });
+      var qBox = panel.querySelector('.js-q'), dots = panel.querySelectorAll('.ecg-dots i');
+      function paintDots() { dots.forEach(function (el, x) { var s = steps[x]; el.className = s in got ? (got[s] === ans[s] ? 'ok' : 'bad') : (x === i ? 'cur' : ''); }); }
+      function ask() {
+        var step = steps[i], opts = step === 'dx' ? dx.map(function (id) { return [id, byId[id].short || byId[id].name]; }) : OPT[step];
+        paintDots();
+        qBox.innerHTML = '<div class="ecg-stepn">' + H.bi(CL.step) + ' ' + (i + 1) + ' ' + H.bi(CL.of) + ' ' + steps.length + ' · ' + H.bi(step === 'dx' ? CL.dx : L[step]) + '</div>' +
+          '<h3>' + H.bi(CL.q[step]) + '</h3><p class="ecg-tip">' + H.bi(CL.tip[step]) + '</p>' +
+          '<div class="hw-opts" role="radiogroup">' + opts.map(function (o) {
+            return '<button type="button" class="hw-opt" role="radio" aria-checked="false" data-v="' + H.esc(o[0]) + '"><span class="hw-box">' + H.icon('check') + '</span>' +
+              '<span class="hw-opt-b"><span class="hw-opt-t">' + H.bi(o[1]) + '</span><span class="hw-opt-tag"></span><span class="hw-opt-why"></span></span></button>';
+          }).join('') + '</div><div class="hw-submit" hidden><button type="button" class="hw-btn hw-btn--accent js-next">' + H.bi(i === steps.length - 1 ? CL.finish : CL.next) + '</button></div>';
+        var group = qBox.querySelector('.hw-opts');
+        group.querySelectorAll('.hw-opt').forEach(function (b) {
+          b.addEventListener('click', function () {
+            if (step in got) return;
+            var v = b.getAttribute('data-v'); got[step] = v;
+            group.classList.add('is-graded');
+            group.querySelectorAll('.hw-opt').forEach(function (o) {
+              var ov = o.getAttribute('data-v'), tag = o.querySelector('.hw-opt-tag');
+              o.setAttribute('aria-checked', String(ov === v)); o.setAttribute('aria-disabled', 'true');
+              if (ov === ans[step]) {
+                o.classList.add('g-ok'); tag.innerHTML = H.bi(ov === v ? CL.right : CL.correctIs);
+                var wy = why(step, ans, m, item); if (wy) o.querySelector('.hw-opt-why').innerHTML = H.bi(wy);
+              } else if (ov === v) { o.classList.add('g-bad'); o.querySelector('.hw-box').innerHTML = H.icon('x'); tag.innerHTML = H.bi(CL.yours); }
+              else o.classList.add('g-skip');
+            });
+            paintDots();
+            var nx = qBox.querySelector('.hw-submit'); nx.hidden = false; nx.querySelector('button').focus({ preventScroll: true });
+          });
+        });
+        qBox.querySelector('.js-next').addEventListener('click', function () { i++; if (i < steps.length) ask(); else result(); });
+      }
+      function result() {
+        var pts = 0, max = 0, wrong = [];
+        steps.forEach(function (s) { max += PTS[s]; if (got[s] === ans[s]) pts += PTS[s]; else wrong.push(s); });
+        var score = max ? Math.round(pts / max * 100) : 0;
+        /* log: best/last score per case; the mistakes list keeps this attempt's errors for the case */
+        var log = getLog(), r = log.r[c.id] || { best: 0, n: 0 };
+        r.best = Math.max(r.best || 0, score); r.last = score; r.n = (r.n || 0) + 1; r.at = Date.now(); log.r[c.id] = r;
+        log.m = log.m.filter(function (x) { return x.c !== c.id; });
+        log.m = wrong.map(function (s) { return { c: c.id, s: s, g: got[s], a: ans[s], at: Date.now() }; }).concat(log.m).slice(0, 80);
+        H.store.set(LOGK, log);
+        paintDots(); dots.forEach(function (el) { el.classList.remove('cur'); });
+        var f = (item && item.f) || {};
+        qBox.innerHTML = '<h3>' + H.bi(CL.result) + '</h3>' +
+          '<div class="hw-score">' + ring(score) + '<p><b dir="ltr">' + pts + ' / ' + max + '</b></p></div>' +
+          '<ul class="ecg-sum">' + steps.map(function (s) {
+            var ok = got[s] === ans[s];
+            return '<li><span class="' + (ok ? 'ok' : 'bad') + '">' + H.icon(ok ? 'check' : 'x') + '</span><b>' + H.bi(s === 'dx' ? CL.dx : L[s]) + '</b><span>' + H.bi(optLabel(s, ans[s])) +
+              (ok ? '' : '<small>' + H.bi(CL.yours) + ': ' + H.bi(optLabel(s, got[s])) + '</small>') + '</span></li>';
+          }).join('') + '</ul>' +
+          (item ? '<div class="js-ex"></div>' : '') +
+          '<div class="ecg-rel js-relc"></div>' +
+          '<div class="ecg-acts"><button type="button" class="hw-btn js-retry">' + H.icon('redo') + H.bi(CL.retry) + '</button>' +
+          (nextOf(c) ? '<button type="button" class="hw-btn hw-btn--accent js-nextc">' + H.bi(CL.nextCase) + '</button>' : '') + '</div>';
+        if (item) {
+          var rows = ['rate', 'rhythm', 'p', 'pr', 'qrs', 'rel'].filter(function (k) { return f[k]; });
+          H.accordion(qBox.querySelector('.js-ex'), [{ id: 'x', title: T(B('{e}: {n}', '{e}: {n}', '{e}: {n}'), { e: CL.expl, n: item.short || item.name }), open: true, html:
+            '<dl class="ecg-f">' + rows.map(function (k) { return '<dt>' + H.bi(L[k]) + '</dt><dd>' + H.bi(noHere(f[k])) + '</dd>'; }).join('') + '</dl>' +
+            (item.text ? '<p class="ecg-txt">' + H.bi(noHere(item.text)) + '</p>' : '') +
+            '<p class="ecg-txt"><a href="#library/' + H.esc(item.id) + '">' + H.bi(CL.openLib) + '</a></p>' }], { soft: true });
+        }
+        var tags = c.tags || (item && item.tags);
+        if (H.related && tags && tags.length) { var rb = d.createElement('div'); qBox.querySelector('.js-relc').appendChild(rb); H.related(rb, tags); }
+        qBox.querySelector('.js-retry').addEventListener('click', function () { playCase(c); top(); });
+        var bn = qBox.querySelector('.js-nextc'); if (bn) bn.addEventListener('click', function () { playCase(nextOf(c)); top(); });
+      }
+      ask();
+    }
+    function nextOf(c) { var list = casesOf(c.set); return list[list.indexOf(c) + 1] || null; }
+    return api;
   }
 
   /* loaded after hawi-core already booted (theme loader) → mount now; boot skips ready elements */
