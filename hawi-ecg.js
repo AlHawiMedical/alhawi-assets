@@ -1,4 +1,4 @@
-/*! Al-Hawi Medical — ECG Academy: strip engine + Library | v0.2.1 (ar/en/tr) | requires hawi-core.js */
+/*! Al-Hawi Medical — ECG Academy: strip engine + Library | v0.2.3 (ar/en/tr) | requires hawi-core.js */
 (function (w, d) {
   'use strict';
   var H = w.Hawi; if (!H) return;
@@ -392,7 +392,7 @@
     pr: B('فاصل PR', 'PR interval', 'PR aralığı'), qrs: B('مركّب QRS', 'QRS complex', 'QRS kompleksi'),
     rel: B('علاقة P بـ QRS', 'P–QRS relationship', 'P–QRS ilişkisi'),
     more: B('اقرأ المزيد', 'Read more', 'Devamını oku'), about: B('الشرح', 'Explanation', 'Açıklama'),
-    monitor: B('مونيتور', 'Monitor', 'Monitör'), paper: B('ورق', 'Paper', 'Kâğıt'),
+    monitor: B('مراقبة', 'Monitor', 'Monitör'), paper: B('تسجيل', 'Paper', 'Kâğıt'),
     play: B('تشغيل', 'Play', 'Oynat'), pause: B('إيقاف', 'Pause', 'Duraklat'),
     sound: B('الصوت', 'Sound', 'Ses'), lib: B('المكتبة', 'Library', 'Kütüphane'),
     hint: B('ورق التخطيط: المربع الصغير 0.04 ثانية × 0.1 ملي فولط، والكبير 0.2 ثانية × 0.5 ملي فولط.', 'ECG paper: small square 0.04 s × 0.1 mV; large square 0.2 s × 0.5 mV.', 'EKG kâğıdı: küçük kare 0,04 sn × 0,1 mV; büyük kare 0,2 sn × 0,5 mV.')
@@ -432,6 +432,7 @@
     '.ecg-f dt:nth-last-of-type(1),.ecg-f dd:last-of-type{border-bottom:0}' +
     '.ecg-txt{margin:12px 0 0;line-height:1.85}' +
     '.ecg-lib{margin-top:14px}' +
+    '@media (hover:hover) and (pointer:fine){.ecg-lib>.hw-tablist{flex-wrap:wrap;overflow:visible;gap:8px}}' +
     '.ecg-list{list-style:none;margin:10px 0 0;padding:0;display:grid;gap:8px}' +
     '.ecg-item{display:flex;align-items:center;gap:10px;width:100%;min-height:50px;padding:10px 14px;border:1px solid var(--hw-line);border-radius:12px;background:var(--hw-bg);color:var(--hw-ink);font:inherit;font-size:15px;font-weight:600;text-align:start;cursor:pointer}' +
     '.ecg-item:hover{border-color:var(--hw-accent)}' +
