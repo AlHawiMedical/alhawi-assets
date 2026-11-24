@@ -1,8 +1,8 @@
-/*! Core: i18n helpers (ar/en/tr), tabs engine, accordion, modal, storage | v0.2 */
+/*! Core: i18n helpers (ar/en/tr), tabs engine, accordion, modal, storage, related posts | v0.3 */
 (function (w, d) {
   'use strict';
   var H = w.Hawi = w.Hawi || {};
-  H.version = '0.2.0';
+  H.version = '0.3.0';
   H.apps = H.apps || {};
 
   /* ---------- text & i18n ---------- */
@@ -226,6 +226,47 @@
     d.body.appendChild(m);
     var f = acts.querySelector('button') || m.querySelector('.hw-modal-x'); if (f) f.focus();
     return close;
+  };
+
+  /* ---------- Blogger label feeds (same origin) ----------
+     Works on any domain: only runs on Blogger pages (they carry an Atom feed link). */
+  H.isBlog = function () { return !!d.querySelector('link[type="application/atom+xml"]'); };
+  H.slug = function (s) { return String(s || '').toLowerCase().replace(/[^a-z0-9-]/g, ''); };
+  var feedCache = {};
+  /* H.feed(label, max) -> Promise<[{u, t:{ar,en,tr}}]> ; post titles "Arabic | English | Türkçe" are split per language */
+  H.feed = function (label, max) {
+    var k = label + '|' + (max || 8);
+    if (feedCache[k]) return feedCache[k];
+    if (!H.isBlog()) return Promise.resolve([]);
+    feedCache[k] = fetch('/feeds/posts/summary/-/' + encodeURIComponent(label) + '?alt=json&max-results=' + (max || 8))
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (j) {
+        return ((j && j.feed && j.feed.entry) || []).map(function (e) {
+          var lk = (e.link || []).filter(function (l) { return l.rel === 'alternate'; })[0];
+          var parts = String((e.title && e.title.$t) || '').split(' | ');
+          return lk ? { u: lk.href, t: { ar: parts[0], en: parts[1] || parts[0], tr: parts[2] || '' } } : null;
+        }).filter(Boolean);
+      })
+      .catch(function () { return []; });
+    return feedCache[k];
+  };
+  /* H.related(box, tags, selfUrl): fills box with posts sharing any of the tags (max 3 tags, 8 links);
+     removes box (and an emptied parent <details>) when nothing is found. */
+  var RELATED = { ar: 'مواد ذات صلة', en: 'Related Content', tr: 'İlgili İçerik' };
+  H.related = function (box, tags, selfUrl) {
+    function drop() { var det = box.closest && box.closest('details'); box.remove(); if (det && !det.querySelector('a')) det.remove(); }
+    tags = (tags || []).map(H.slug).filter(Boolean).slice(0, 3);
+    selfUrl = selfUrl || location.href.split('#')[0].split('?')[0];
+    if (!tags.length || !H.isBlog()) { setTimeout(drop, 0); return; }
+    Promise.all(tags.map(function (t) { return H.feed(t, 8); })).then(function (lists) {
+      var seen = {}, items = [];
+      lists.forEach(function (l) { l.forEach(function (x) {
+        if (seen[x.u] || x.u.split('?')[0] === selfUrl) return; seen[x.u] = 1; items.push(x);
+      }); });
+      if (!items.length) { drop(); return; }
+      box.innerHTML = '<div class="hw-res-h">' + H.bi(RELATED) + '</div><ul class="hw-links">' + items.slice(0, 8).map(function (x) {
+        return '<li><a href="' + H.esc(x.u) + '">' + H.bi(x.t) + '</a></li>'; }).join('') + '</ul>';
+    });
   };
 
   /* ---------- auto-init: <div data-hawi-app="case" data-src="json-id"> ---------- */

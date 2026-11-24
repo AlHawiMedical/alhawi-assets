@@ -1,8 +1,11 @@
-/*! ECG Academy: strip engine + Library | v0.2.3 (ar/en/tr) | requires hawi-core.js */
+/*! ECG Academy: strip engine + Library + academy shell (tabs, deep links, related) | v0.3.0 (ar/en/tr) | requires hawi-core.js v0.3 */
 (function (w, d) {
   'use strict';
   var H = w.Hawi; if (!H) return;
   var E = H.ecg = H.ecg || {};
+  /* where this file was loaded from: data files sit next to it, with the same ?v= */
+  var SELF = (d.currentScript && d.currentScript.src) || '';
+  var BASE = SELF.replace(/[?#].*$/, '').replace(/[^\/]*$/, ''), VQ = (SELF.split('?')[1] ? '?' + SELF.split('?')[1] : '');
 
   /* =====================================================================
      1. ENGINE — rhythm generators produce timed events; the signal is a sum
@@ -395,6 +398,14 @@
     monitor: B('مراقبة', 'Monitor', 'Monitör'), paper: B('تسجيل', 'Paper', 'Kâğıt'),
     play: B('تشغيل', 'Play', 'Oynat'), pause: B('إيقاف', 'Pause', 'Duraklat'),
     sound: B('الصوت', 'Sound', 'Ses'), lib: B('المكتبة', 'Library', 'Kütüphane'),
+    title: B('أكاديمية تخطيط القلب', 'ECG Academy', 'EKG Akademisi'),
+    sub: B('اقرأ الشريط خطوة بخطوة: السرعة والنظم والموجات والفواصل.', 'Read the strip step by step: rate, rhythm, waves and intervals.', 'Şeridi adım adım okuyun: hız, ritim, dalgalar ve aralıklar.'),
+    cases: B('الحالات', 'Cases', 'Vakalar'), train: B('التدريب', 'Practice', 'Alıştırma'), lessons: B('الدروس', 'Lessons', 'Dersler'),
+    soon: B('قريباً', 'Coming soon', 'Yakında'),
+    casesSoon: B('حالات تفاعلية مرتبة حسب الصعوبة: تقرأ الشريط خطوة بخطوة وتحصل على درجة وشرح.', 'Interactive cases by difficulty: read the strip step by step and get a score and explanation.', 'Zorluğa göre etkileşimli vakalar: şeridi adım adım okuyun, puan ve açıklama alın.'),
+    trainSoon: B('شرائط عشوائية بلا نهاية من الزمر التي تختارها، مع فرجار رقمي للقياس.', 'Endless random strips from the groups you choose, with digital calipers.', 'Seçtiğiniz gruplardan sınırsız rastgele şeritler ve dijital pergel.'),
+    lessonsSoon: B('دروس التخطيط تُنشر قريباً، وتظهر هنا تلقائياً.', 'ECG lessons are coming soon and will appear here automatically.', 'EKG dersleri yakında yayınlanacak ve burada otomatik olarak görünecek.'),
+    loading: B('جارٍ التحميل…', 'Loading…', 'Yükleniyor…'),
     hint: B('ورق التخطيط: المربع الصغير 0.04 ثانية × 0.1 ملي فولط، والكبير 0.2 ثانية × 0.5 ملي فولط.', 'ECG paper: small square 0.04 s × 0.1 mV; large square 0.2 s × 0.5 mV.', 'EKG kâğıdı: küçük kare 0,04 sn × 0,1 mV; büyük kare 0,2 sn × 0,5 mV.')
   };
   E.L = L;
@@ -406,6 +417,10 @@
   };
 
   var CSS = '' +
+    '.ecg-head{margin:0 0 14px}.ecg-head h2{margin:0 0 4px;font-size:1.35rem}.ecg-head p{margin:0;opacity:.7;font-size:14px;line-height:1.7}' +
+    '.ecg-soon{padding:22px 18px;border:1px dashed var(--hw-line);border-radius:var(--hw-radius,14px);text-align:center;line-height:1.8}' +
+    '.ecg-soon b{display:inline-block;margin-bottom:6px;padding:2px 10px;border-radius:99px;background:var(--hw-accent-soft);color:var(--hw-accent-ink);font-size:13px}' +
+    '.ecg-rel:empty{display:none}.ecg-rel{margin-top:6px}' +
     '.ecg{--ecg-tr:#0c9784}' +
     '.ecg-view{border-radius:var(--hw-radius,14px);overflow:hidden;border:1px solid var(--hw-line);background:var(--hw-bg)}' +
     '.ecg-screen{position:relative;background:#06161a;line-height:0}' +
@@ -446,6 +461,53 @@
     var st = d.createElement('style'); st.id = 'hawi-ecg-css'; st.textContent = CSS; d.head.appendChild(st);
   }
 
+  /* =====================================================================
+     5. ACADEMY SHELL — tabs (library · cases · practice · lessons) + deep links
+        #library/<id> · #cases · #train · #lessons
+     ===================================================================== */
+  function route() {
+    var h = decodeURIComponent((location.hash || '').slice(1)).split('/');
+    var tab = ['library', 'cases', 'train', 'lessons'].indexOf(h[0]) > -1 ? h[0] : null;
+    return { tab: tab, a: h[1] || null, b: h[2] || null };
+  }
+  function setHash(h) { try { history.replaceState(null, '', '#' + h); } catch (e) {} }
+  function soon(text) { return '<div class="ecg-soon"><b>' + H.bi(L.soon) + '</b><br>' + H.bi(text) + '</div>'; }
+  function lessons(p) {
+    p.innerHTML = '<p class="ecg-hint">' + H.bi(L.loading) + '</p>';
+    H.feed('ECG', 150).then(function (list) {
+      if (!list.length) { p.innerHTML = soon(L.lessonsSoon); return; }
+      p.innerHTML = '<ul class="hw-links">' + list.map(function (x) { return '<li><a href="' + H.esc(x.u) + '">' + H.bi(x.t) + '</a></li>'; }).join('') + '</ul>';
+    });
+  }
+  function shell(mount, data) {
+    mount.classList.add('ecg-app');
+    mount.innerHTML = '<header class="ecg-head"><h2>' + H.bi(L.title) + '</h2><p>' + H.bi(L.sub) + '</p></header><div class="js-top"></div>';
+    var r = route(), lib = null;
+    var top = H.tabs(mount.querySelector('.js-top'), { variant: 'line', tabs: [
+      { id: 'library', label: L.lib, render: function (p) { lib = library(p, data, r.tab === 'library' ? r.a : null); } },
+      { id: 'cases', label: L.cases, html: soon(L.casesSoon) },
+      { id: 'train', label: L.train, html: soon(L.trainSoon) },
+      { id: 'lessons', label: L.lessons, render: lessons }
+    ], onChange: function (id) { if (ready) setHash(id === 'library' && lib ? 'library/' + lib.cur() : id); } });
+    var ready = false;
+    top.select(r.tab || 'library', { silent: true });
+    ready = true;
+    w.addEventListener('hashchange', function () {
+      var x = route(); if (!x.tab) return;
+      top.select(x.tab);
+      if (x.tab === 'library' && x.a && lib) lib.go(x.a, true);
+    });
+  }
+
+  /* data: <script type="text/hawi"> in the page (old pages), else the data file next to this script */
+  function withData(cb) {
+    if (E.data) { cb(E.data); return; }
+    var done = function () { try { E.data = H.decode(w.HawiEcgData || ''); } catch (e) { E.data = null; } cb(E.data); };
+    if (w.HawiEcgData) { done(); return; }
+    var s = d.createElement('script'); s.src = BASE + 'hawi-ecg-data.js' + VQ; s.onload = done; s.onerror = function () { cb(null); };
+    d.body.appendChild(s);
+  }
+
   H.apps.ecg = function (mount, data) {
     injectCss();
     /* inline strip inside a lesson post: <div data-hawi-app="ecg" data-strip='{"r":"af","rate":110,"qrs":0.08}'> */
@@ -456,11 +518,17 @@
       mount.innerHTML = E.paper(spec, { seconds: +mount.getAttribute('data-seconds') || 6 });
       return;
     }
-    if (!data || !data.items || !data.items.length) return;
+    if (data && data.items && data.items.length) { shell(mount, data); return; }
+    mount.innerHTML = '<p class="ecg-hint">' + H.bi(L.loading) + '</p>';
+    withData(function (x) { if (x && x.items && x.items.length) shell(mount, x); else mount.innerHTML = ''; });
+  };
+
+  /* library atlas inside a panel; returns { cur(), go(id, scroll) } */
+  function library(mount, data, startId) {
     var items = data.items, groups = data.groups || [{ id: 'all', name: L.lib }];
     var key = 'ecg-lib';
     var pref = H.store.get(key, {});
-    var cur = items.filter(function (x) { return x.id === pref.id; })[0] || items[0];
+    var cur = items.filter(function (x) { return x.id === (startId || pref.id); })[0] || items.filter(function (x) { return x.id === pref.id; })[0] || items[0];
     var mode = reduce ? 'paper' : (pref.mode || 'monitor');
 
     mount.classList.add('ecg');
@@ -475,6 +543,7 @@
         '<div class="js-stage"></div>' +
       '</section>' +
       '<div class="ecg-more js-more"></div>' +
+      '<div class="ecg-rel js-relw"></div>' +
       '<div class="ecg-lib js-lib"></div>';
 
     var stage = mount.querySelector('.js-stage'), mon = null;
@@ -508,9 +577,11 @@
         '<dl class="ecg-f">' + rows.map(function (k) { return '<dt>' + H.bi(L[k]) + '</dt><dd>' + H.bi(f[k]) + '</dd>'; }).join('') + '</dl>' +
         (cur.text ? '<p class="ecg-txt">' + H.bi(cur.text) + '</p>' : '') }], { soft: true });
       box.querySelector('details').addEventListener('toggle', function (e) { pref.open = e.target.open; H.store.set(key, pref); });
+      var rw = mount.querySelector('.js-relw'); rw.innerHTML = '';
+      if (H.related && cur.tags && cur.tags.length) { var rb = d.createElement('div'); rw.appendChild(rb); H.related(rb, cur.tags); }
     }
     function select(it, scroll) {
-      cur = it; pref.id = it.id; H.store.set(key, pref);
+      cur = it; pref.id = it.id; H.store.set(key, pref); setHash('library/' + it.id);
       mount.querySelector('.js-name').innerHTML = H.bi(it.short || it.name);
       if (mon) mon.set(it.strip); else renderStage();
       renderMore();
@@ -546,7 +617,15 @@
     mount.querySelector('.js-name').innerHTML = H.bi(cur.short || cur.name);
     renderStage(); renderMore();
     E.active = function () { return { mon: mon, mode: mode, cur: cur }; }; /* test/debug hook */
-  };
+    return {
+      cur: function () { return cur.id; },
+      go: function (id, scroll) {
+        var it = items.filter(function (x) { return x.id === id; })[0]; if (!it || it === cur) return;
+        var gt = (groups.filter(function (gr) { return gr.id === it.group; })[0] || {}).id; if (gt) tabs.select(gt);
+        select(it, scroll);
+      }
+    };
+  }
 
   /* loaded after hawi-core already booted (theme loader) → mount now; boot skips ready elements */
   if (d.readyState !== 'loading' && H.boot) H.boot();
