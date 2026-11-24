@@ -1,4 +1,4 @@
-/*! ECG Academy: strip engine + Library + academy shell (tabs, deep links, related) | v0.3.0 (ar/en/tr) | requires hawi-core.js v0.3 */
+/*! ECG Academy: strip engine + Library + academy shell (tabs, deep links, related) | v0.3.1 (ar/en/tr) | requires hawi-core.js v0.3 */
 (function (w, d) {
   'use strict';
   var H = w.Hawi; if (!H) return;
@@ -481,7 +481,9 @@
   }
   function shell(mount, data) {
     mount.classList.add('ecg-app');
-    mount.innerHTML = '<header class="ecg-head"><h2>' + H.bi(L.title) + '</h2><p>' + H.bi(L.sub) + '</p></header><div class="js-top"></div>';
+    /* the page's own title (Blogger h1) already names the academy: show ours only when there is none */
+    var own = d.querySelector('h1');
+    mount.innerHTML = '<header class="ecg-head">' + (own ? '' : '<h2>' + H.bi(L.title) + '</h2>') + '<p>' + H.bi(L.sub) + '</p></header><div class="js-top"></div>';
     var r = route(), lib = null;
     var top = H.tabs(mount.querySelector('.js-top'), { variant: 'line', tabs: [
       { id: 'library', label: L.lib, render: function (p) { lib = library(p, data, r.tab === 'library' ? r.a : null); } },
