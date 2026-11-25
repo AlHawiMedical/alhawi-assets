@@ -1,4 +1,4 @@
-/*! Core UI (tabs, accordion, modal) + case app | v0.2.2 */
+/*! Core UI (tabs, accordion, modal) + case app | v0.2.3 */
 :root{
   --hw-accent:var(--linkB,#0c9784);
   --hw-accent-ink:var(--linkC,#0a7a6b);
@@ -141,7 +141,7 @@ html[dir=rtl] .hw-vitals td{text-align:right}
 .hw-opt.g-neutral .hw-opt-tag{background:var(--hw-line);color:var(--hw-ink)}
 .hw-opt.g-skip{opacity:.6}
 .hw-opt.g-skip .hw-opt-tag{display:none}
-.hw-submit{position:sticky;bottom:0;z-index:5;padding:12px 0 calc(12px + env(safe-area-inset-bottom));background:linear-gradient(transparent,var(--hw-bg) 30%)}
+.hw-submit{position:sticky;bottom:0;z-index:5;padding:12px 0 calc(12px + env(safe-area-inset-bottom));background:linear-gradient(transparent,var(--bodyB,var(--hw-bg)) 30%)}
 .hw-submit .hw-btn{width:100%}
 .hw-score{display:flex;align-items:center;gap:16px;padding:16px;border-radius:var(--hw-radius);background:var(--hw-bg-soft);margin:10px 0}
 .hw-ring{--p:0;--c:var(--hw-accent);width:84px;height:84px;flex-shrink:0;border-radius:50%;background:conic-gradient(var(--c) calc(var(--p)*1%),var(--hw-line) 0);display:grid;place-items:center}
