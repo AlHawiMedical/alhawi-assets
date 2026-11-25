@@ -1,15 +1,42 @@
-/*! Core: i18n helpers (ar/en/tr), tabs engine, accordion, modal, storage (progress + mistakes log), related posts, tab order | v0.4.1 */
+/*! Core: i18n helpers (ar/en/tr), tabs engine, accordion, modal, storage (progress + mistakes log), related posts, tab order,
+    tooltip shortcodes [[…]] (loads hawi-tt.js on demand) | v0.4.2 */
 (function (w, d) {
   'use strict';
   var H = w.Hawi = w.Hawi || {};
-  H.version = '0.4.1';
+  H.version = '0.4.2';
+  /* where this file came from: sibling files (hawi-tt.js, hawi-glossary.json) load from the same folder with the same ?v= */
+  (function () {
+    var s = d.currentScript && d.currentScript.src || '', m = s.match(/^(.*\/)hawi-core\.js(\?[^#]*)?/);
+    H.base = m ? m[1] : 'https://alhawimedical.github.io/alhawi-assets/'; H.ver = m && m[2] || '';
+  })();
   H.apps = H.apps || {};
 
   /* ---------- text & i18n ---------- */
   var ESC = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
   H.esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return ESC[c]; }); };
   /* minimal markup: **bold** */
-  H.fmt = function (s) { return H.esc(s).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>'); };
+  H.fmt = function (s) { return H.tt(H.esc(s).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')); };
+  /* tooltip shortcodes on already-escaped text (so nothing here can inject markup):
+     [[term]] -> glossary lookup by name/alias · [[term|#key]] -> glossary entry · [[term|explanation]] -> inline (Syria24News form) */
+  var TT = /\[\[([^\[\]|]{1,120}?)(?:\|([^\[\]]{1,600}?))?\]\]/g;
+  H.tt = function (html) {
+    if (html.indexOf('[[') < 0) return html;
+    return html.replace(TT, function (all, t, x) {
+      t = t.trim(); if (!t) return all;
+      x = x == null ? '' : x.trim();
+      var at = x.charAt(0) === '#' ? ' data-k="' + H.slug(x.slice(1)) + '"' : x ? ' data-d="' + x + '"' : '';
+      H.needTT();
+      return '<span class="hw-tt" tabindex="0" role="button"' + at + '>' + t + '</span>';
+    });
+  };
+  /* load hawi-tt.js once, only on pages that actually have tooltips */
+  H.needTT = function () {
+    if (H._ttLoad) return; H._ttLoad = 1;
+    setTimeout(function () {
+      if (H.ttInit) return;
+      var e = d.createElement('script'); e.src = H.base + 'hawi-tt.js' + H.ver; (d.body || d.head).appendChild(e);
+    }, 0);
+  };
   H.LANGS = ['ar', 'en', 'tr'];
   H.lang = function () {
     if (w.hawiLang && w.hawiLang.get) return w.hawiLang.get();
@@ -408,6 +435,8 @@
       app(el, data);
     });
   };
-  if (d.readyState === 'loading') d.addEventListener('DOMContentLoaded', function () { H.boot(); });
-  else setTimeout(function () { H.boot(); }, 0);
+  /* plain posts (lessons, articles) written with [[…]] in the Blogger editor */
+  function bootTT() { var pb = d.getElementById('postBody'); if (pb && pb.textContent.indexOf('[[') > -1) H.needTT(); }
+  if (d.readyState === 'loading') d.addEventListener('DOMContentLoaded', function () { H.boot(); bootTT(); });
+  else setTimeout(function () { H.boot(); bootTT(); }, 0);
 })(window, document);
