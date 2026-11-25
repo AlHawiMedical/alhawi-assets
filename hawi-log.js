@@ -1,5 +1,5 @@
 /*! General mistakes log: every app's mistakes in one page (clinical cases, ECG, later cards / question banks)
-    | v0.1.0 (ar/en/tr) | requires hawi-core.js v0.4
+    | v0.1.1 (ar/en/tr) | requires hawi-core.js v0.4
     Page: <div data-hawi-app="log"></div> ; one app only: <div data-hawi-app="log" data-app="ecg"></div> */
 (function (w, d) {
   'use strict';
@@ -16,6 +16,9 @@
     intro: B('أخطاؤك في آخر محاولة لكل حالة أو تمرين، من كل الأقسام، والأضعف أولاً. حين تعيد الحالة وتصحّح خطأك يختفي من هنا.',
       'Your mistakes from the latest attempt at each case or exercise, across all sections, weakest first. Retry and fix a mistake and it leaves this list.',
       'Tüm bölümlerde her vaka veya alıştırmanın son denemesindeki hatalarınız, en zayıftan başlayarak. Vakayı tekrarlayıp hatanızı düzeltince buradan kalkar.'),
+    introOne: B('أخطاؤك في آخر محاولة لكل حالة أو تمرين، والأضعف أولاً. حين تعيد المحاولة وتصحّح خطأك يختفي من هنا.',
+      'Your mistakes from the latest attempt at each case or exercise, weakest first. Retry and fix a mistake and it leaves this list.',
+      'Her vaka veya alıştırmanın son denemesindeki hatalarınız, en zayıftan başlayarak. Tekrar deneyip hatanızı düzeltince buradan kalkar.'),
     all: B('الكل', 'All', 'Tümü'),
     solved: B('محلولة', 'solved', 'çözüldü'),
     withM: B('فيها أخطاء', 'with mistakes', 'hatalı'),
@@ -83,7 +86,8 @@
       var items = all.items.filter(function (x) { return sel === '*' || x.app === sel; });
       var nSolved = apps.reduce(function (s, a) { return s + (all.solved[a] || 0); }, 0);
       var nMist = all.items.reduce(function (s, x) { return s + x.es.length; }, 0);
-      var head = '<section class="hw-card"><h3>' + bi(L.title) + '</h3><p class="hwl-intro">' + bi(L.intro) + '</p>' +
+      /* inside a section page (data-app) the tab already names it: no title, section-only intro */
+      var head = '<section class="hw-card">' + (only ? '<p class="hwl-intro" style="margin-top:0">' + bi(L.introOne) + '</p>' : '<h3>' + bi(L.title) + '</h3><p class="hwl-intro">' + bi(L.intro) + '</p>') +
         '<div class="hw-stats"><div><b>' + nSolved + '</b>' + bi(L.solved) + '</div><div><b>' + all.items.length + '</b>' + bi(L.withM) +
         '</div><div><b>' + nMist + '</b>' + bi(L.mist) + '</div></div>' +
         (only ? '' : '<div class="hwl-chips" role="group">' + ['*'].concat(apps).map(function (a) {
