@@ -1,8 +1,8 @@
-/*! Core: i18n helpers (ar/en/tr), tabs engine, accordion, modal, storage (progress + mistakes log), related posts | v0.4 */
+/*! Core: i18n helpers (ar/en/tr), tabs engine, accordion, modal, storage (progress + mistakes log), related posts, tab order | v0.4.1 */
 (function (w, d) {
   'use strict';
   var H = w.Hawi = w.Hawi || {};
-  H.version = '0.4.0';
+  H.version = '0.4.1';
   H.apps = H.apps || {};
 
   /* ---------- text & i18n ---------- */
@@ -324,6 +324,16 @@
     d.body.appendChild(m);
     var f = acts.querySelector('button') || m.querySelector('.hw-modal-x'); if (f) f.focus();
     return close;
+  };
+
+  /* tab order chosen on the page: <div data-hawi-app="…" data-order="lessons,train,cases"> ;
+     listed ids come first in that order, the rest keep their place after them; unknown ids are ignored */
+  H.order = function (tabs, attr) {
+    var ids = String(attr || '').split(/[\s,]+/).filter(Boolean);
+    if (!ids.length) return tabs;
+    var by = {}; tabs.forEach(function (t) { by[t.id] = t; });
+    var first = ids.filter(function (id, i) { return by[id] && ids.indexOf(id) === i; }).map(function (id) { return by[id]; });
+    return first.concat(tabs.filter(function (t) { return first.indexOf(t) < 0; }));
   };
 
   /* ---------- Blogger label feeds (same origin) ----------

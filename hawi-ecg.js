@@ -1,4 +1,5 @@
-/*! ECG Academy: strip engine + Library + Cases + Practice + calipers + academy shell (tabs, deep links, related) | v0.7.0 (ar/en/tr) | requires hawi-core.js v0.4
+/*! ECG Academy: strip engine + Library + Cases + Practice + calipers + academy shell (tabs, deep links, related) | v0.7.1 (ar/en/tr) | requires hawi-core.js v0.4
+   v0.7.1: tab order from the page (data-order)
    v0.7: cases progress + mistakes through the shared H.prog('ecg') / H.log (read by the general log page); keys ecg:train, ecg:pref; old data migrated once */
 (function (w, d) {
   'use strict';
@@ -492,14 +493,16 @@
     var own = d.querySelector('h1');
     mount.innerHTML = '<header class="ecg-head">' + (own ? '' : '<h2>' + H.bi(L.title) + '</h2>') + '<p>' + H.bi(L.sub) + '</p></header><div class="js-top"></div>';
     var r = route(), lib = null, cs = null, tr = null;
-    var top = H.tabs(mount.querySelector('.js-top'), { variant: 'line', tabs: [
+    /* tab order: data-order on the page div (ids: library, cases, train, lessons); the first tab opens by default */
+    var tabs = H.order([
       { id: 'library', label: L.lib, render: function (p) { var x = route(); lib = library(p, data, x.tab === 'library' ? x.a : null); } },
       { id: 'cases', label: L.cases, render: function (p) { var x = route(); cs = casesTab(p, data, x.tab === 'cases' ? x : null); } },
       { id: 'train', label: L.train, render: function (p) { var x = route(); tr = trainTab(p, data, x.tab === 'train' ? x : null); } },
       { id: 'lessons', label: L.lessons, render: lessons }
-    ], onChange: function (id) { if (ready) setHash(id === 'library' && lib ? 'library/' + lib.cur() : id === 'cases' && cs ? cs.hash() : id === 'train' && tr ? tr.hash() : id); } });
+    ], mount.getAttribute('data-order'));
+    var top = H.tabs(mount.querySelector('.js-top'), { variant: 'line', tabs: tabs, onChange: function (id) { if (ready) setHash(id === 'library' && lib ? 'library/' + lib.cur() : id === 'cases' && cs ? cs.hash() : id === 'train' && tr ? tr.hash() : id); } });
     var ready = false;
-    top.select(r.tab || 'library', { silent: true });
+    top.select(r.tab || tabs[0].id, { silent: true });
     ready = true;
     w.addEventListener('hashchange', function () {
       var x = route(); if (!x.tab) return;
