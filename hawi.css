@@ -1,4 +1,4 @@
-/*! Core UI (tabs, accordion, modal) + case app + tooltips | v0.2.5 */
+/*! Core UI (tabs, accordion, modal) + case app + tooltips | v0.2.6 */
 :root{
   --hw-accent:var(--linkB,#0c9784);
   --hw-accent-ink:var(--linkC,#0a7a6b);
@@ -208,7 +208,11 @@ html[dir=rtl] .hw-vitals td{text-align:right}
 [data-hawi-app] svg[fill=none] *,.hw-modal svg[fill=none] *{fill:none!important}
 /* tooltips (hawi-tt.js): first occurrence of a term = accent colour only — never an underline, no change on hover/tap (Hassan's rule);
    repeats/unknown stay plain text */
-.hw-tt{color:var(--hw-accent-ink);text-decoration:none!important;border:0;cursor:pointer}
+/* --hw-tt-ink = the word colour; one variable, so it can be switched without touching this file.
+   now: option A (text colour, faded). option B (fixed blue-grey): :root{--hw-tt-ink:#2e5f80} .drK{--hw-tt-ink:#9dbdd3} */
+:root{--hw-tt-ink:color-mix(in srgb,var(--hw-ink) 64%,var(--hw-bg))}
+.drK{--hw-tt-ink:color-mix(in srgb,var(--hw-ink) 60%,var(--hw-bg))}
+.hw-tt{color:var(--hw-tt-ink);text-decoration:none!important;border:0;cursor:pointer}
 .hw-tt:focus{outline:none}.hw-tt:focus-visible{outline:2px solid var(--hw-accent);outline-offset:2px;border-radius:3px}
 .hw-tt.hw-tt-x{color:inherit;cursor:inherit}
 .hw-ttp{position:fixed;z-index:10050;box-sizing:border-box;max-width:calc(100vw - 16px);padding:12px 14px 10px;border-radius:12px;background:var(--hw-bg);color:var(--hw-ink);border:1px solid var(--hw-line);box-shadow:0 10px 30px rgba(0,0,0,.18);font-size:14px;line-height:1.65;text-align:start}
