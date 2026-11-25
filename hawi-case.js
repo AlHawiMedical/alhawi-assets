@@ -1,10 +1,12 @@
-/*! Clinical Case app (Play / Review / Discussion) | v0.3.1 (ar/en/tr) | requires hawi-core.js
+/*! Clinical Case app (Play / Review / Discussion) | v0.4.0 (ar/en/tr) | requires hawi-core.js v0.4
     v0.3: investigation results (r) + media, meta (level, tags), discussion links + related posts by tag,
           personal log of mistakes (data-view="progress")
-    v0.3.1: no platform name in code; related posts work on any domain */
+    v0.3.1: no platform name in code; related posts work on any domain
+    v0.4: progress + mistakes through the shared H.prog / H.log (hawi-core v0.4): tags, short texts, relative retry
+          links, read by the general log page; pre-v0.4 data migrated once (old keys kept) */
 (function (w, d) {
   'use strict';
-  var H = w.Hawi; if (!H) return;
+  var H = w.Hawi; if (!H || !H.prog) return; /* needs hawi-core v0.4 */
   var bi = H.bi, icon = H.icon;
   function B(ar, en, tr) { var o = { ar: ar, en: en }; if (tr) o.tr = tr; return o; }
 
@@ -79,21 +81,31 @@
     });
   }
 
-  /* ---------- personal log (all cases, this device) ---------- */
-  var LOG = 'case-log';
-  function logPut(data, saved, r) {
-    var log = H.store.get(LOG, {});
-    var pick = function (arr, ess) { return arr.filter(function (o) { return !ess || o.w === 2; }).map(function (o) { return o.t; }).slice(0, 6); };
-    log[data.id] = {
-      u: location.href.split('#')[0].split('?')[0], t: data.title, sp: data.specialty, lv: data.meta && data.meta.level,
-      best: saved.best, last: r.score, n: saved.attempts, at: Date.now(),
-      miss: pick(r.inv.miss.concat(r.mgmt.miss), true), bad: pick(r.inv.bad.concat(r.mgmt.bad))
-    };
-    H.store.set(LOG, log);
+  /* ---------- progress + mistakes (shared layer: H.prog('case') + H.log, app 'case') ---------- */
+  var P = H.prog('case');
+  function info(data) {
+    var meta = data.meta || {};
+    return { t: data.title, sp: data.specialty, lv: meta.level || 0, tags: (meta.tags || []).map(H.slug).filter(Boolean), u: H.path() };
+  }
+  function logPut(data, r) {
+    var ess = r.inv.miss.concat(r.mgmt.miss).filter(function (o) { return o.w === 2; }), bad = r.inv.bad.concat(r.mgmt.bad);
+    H.log.put('case', data.id,
+      ess.map(function (o) { return { k: 'miss', ref: o.id, x: o.t }; }).concat(bad.map(function (o) { return { k: 'bad', ref: o.id, x: o.t }; })),
+      info(data));
+  }
+  function caseLog() {
+    var all = P.all(), out = {};
+    Object.keys(all).forEach(function (id) {
+      var r = all[id], es = H.log.list({ app: 'case', it: id });
+      out[id] = { u: r.u, t: r.t || id, sp: r.sp, lv: r.lv, best: r.best, last: r.last, n: r.n, at: r.at,
+        miss: es.filter(function (e) { return e.k === 'miss'; }).map(function (e) { return e.x; }).slice(0, 6),
+        bad: es.filter(function (e) { return e.k === 'bad'; }).map(function (e) { return e.x; }).slice(0, 6) };
+    });
+    return out;
   }
   function renderLog(mount) {
     function draw() {
-      var log = H.store.get(LOG, {}), ids = Object.keys(log);
+      var log = caseLog(), ids = Object.keys(log);
       if (!ids.length) { mount.innerHTML = '<div class="hw-case"><section class="hw-card"><h3>' + bi(L.myLog) + '</h3><p>' + bi(L.logEmpty) + '</p></section></div>'; return; }
       ids.sort(function (a, b) { return (log[a].last || 0) - (log[b].last || 0); });
       var avg = Math.round(ids.reduce(function (s, id) { return s + (log[id].best || 0); }, 0) / ids.length);
@@ -107,7 +119,7 @@
             '<div><small>' + bi(x.sp) + '</small><b>' + bi(x.t) + '</b><small>' + bi(L.best) + ': ' + x.best + ' · ' + bi(L.attempts) + ': ' + x.n + '</small></div></div>' +
             (x.miss && x.miss.length ? '<div class="hw-res-h">' + bi(L.missedEss) + '</div><ul class="hw-log-l l-miss">' + li(x.miss) + '</ul>' : '') +
             (x.bad && x.bad.length ? '<div class="hw-res-h">' + bi(L.wrongPicks) + '</div><ul class="hw-log-l l-bad">' + li(x.bad) + '</ul>' : '') +
-            (safeUrl(x.u) ? '<div class="hw-acts"><a class="hw-btn hw-btn--accent" href="' + H.esc(x.u) + '">' + icon('redo') + bi(L.open) + '</a></div>' : '') +
+            (safeUrl(x.u) || /^\/[^\/]/.test(x.u || '') ? '<div class="hw-acts"><a class="hw-btn hw-btn--accent" href="' + H.esc(x.u) + '">' + icon('redo') + bi(L.open) + '</a></div>' : '') +
             '</section>';
         }).join('') +
         '<div class="hw-acts"><button type="button" class="hw-btn js-clear">' + icon('x') + bi(L.clearLog) + '</button></div></div>';
@@ -115,8 +127,8 @@
         H.modal({ icon: 'alert', title: L.clearLog, body: '<p>' + bi(L.clearQ) + '</p>', actions: [
           { label: L.back },
           { label: L.clearLog, kind: 'danger', onClick: function (c) {
-            Object.keys(H.store.get(LOG, {})).forEach(function (id) { H.store.del('case:' + id); });
-            H.store.del(LOG); c(); draw(); } }] });
+            Object.keys(H.store.get('case-log', {}) || {}).forEach(function (id) { H.store.del('case:' + id); });
+            H.store.del('case-log'); P.clear(); H.log.clear('case'); c(); draw(); } }] });
       });
     }
     draw();
@@ -153,8 +165,16 @@
   H.apps['case'] = function (mount, data) {
     if (mount.getAttribute('data-view') === 'progress') { renderLog(mount); return; }
     if (!data) return;
-    var key = 'case:' + data.id;
-    var saved = H.store.get(key, { best: null, attempts: 0, last: null });
+    /* previews (encoder tool) keep a device-only record and never reach the progress/log */
+    var pv = /^preview-/.test(data.id), key = 'case:' + data.id, rec = pv ? null : P.get(data.id);
+    var saved = pv ? H.store.get(key, { best: null, attempts: 0, last: null }) :
+      { best: rec ? rec.best : null, attempts: rec ? rec.n : 0, last: rec && rec.ans ? { inv: rec.ans.inv || [], mgmt: rec.ans.mgmt || [], score: rec.last } : null };
+    function save(score) {
+      if (pv) { H.store.set(key, saved); return; }
+      var x = info(data), extra = { ans: saved.last ? { inv: saved.last.inv, mgmt: saved.last.mgmt } : null, t: x.t, sp: x.sp, lv: x.lv, u: x.u };
+      if (score != null) P.score(data.id, score, extra);
+      else { var r = P.get(data.id); if (r) { for (var k in extra) r[k] = extra[k]; P.set(data.id, r); } }
+    }
     var st = { inv: {}, mgmt: {}, graded: false, result: null };
     if (saved.last) {
       (saved.last.inv || []).forEach(function (id) { st.inv[id] = 1; });
@@ -285,8 +305,8 @@
       saved.attempts = (saved.attempts || 0) + 1;
       saved.best = saved.best == null ? st.result.score : Math.max(saved.best, st.result.score);
       saved.last = { inv: Object.keys(st.inv), mgmt: Object.keys(st.mgmt), score: st.result.score };
-      H.store.set(key, saved);
-      if (!/^preview-/.test(data.id)) logPut(data, saved, st.result);
+      save(st.result.score);
+      if (!pv) logPut(data, st.result);
       mount.querySelector('.js-best').textContent = saved.best;
       tabs.unlock('review'); tabs.unlock('discussion'); tabs.done('play');
       tabs.rerender('play'); tabs.rerender('review');
@@ -376,7 +396,7 @@
 
     function retry() {
       st.inv = {}; st.mgmt = {}; st.graded = false; st.result = null;
-      saved.last = null; H.store.set(key, saved);
+      saved.last = null; save(null);
       tabs.done('play', false); tabs.lock('review'); tabs.lock('discussion');
       tabs.rerender('review'); tabs.rerender('discussion');
       tabs.select('play'); tabs.rerender('play');

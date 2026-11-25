@@ -1,7 +1,14 @@
-/*! ECG Academy: strip engine + Library + Cases + Practice + calipers + academy shell (tabs, deep links, related) | v0.6.0 (ar/en/tr) | requires hawi-core.js v0.3 */
+/*! ECG Academy: strip engine + Library + Cases + Practice + calipers + academy shell (tabs, deep links, related) | v0.7.0 (ar/en/tr) | requires hawi-core.js v0.4
+   v0.7: cases progress + mistakes through the shared H.prog('ecg') / H.log (read by the general log page); keys ecg:train, ecg:pref; old data migrated once */
 (function (w, d) {
   'use strict';
-  var H = w.Hawi; if (!H) return;
+  var H = w.Hawi; if (!H || !H.prog) return; /* needs hawi-core v0.4 */
+  /* pre-v0.4 keys → new names (old ones kept for one version) */
+  H.migrate('ecg-keys-v04', function () {
+    var t = H.store.get('ecg-train', null), l = H.store.get('ecg-lib', null);
+    if (t && !H.store.get('ecg:train', null)) H.store.set('ecg:train', t);
+    if (l && !H.store.get('ecg:pref', null)) H.store.set('ecg:pref', l);
+  });
   var E = H.ecg = H.ecg || {};
   /* where this file was loaded from: data files sit next to it, with the same ?v= */
   var SELF = (d.currentScript && d.currentScript.src) || '';
@@ -530,7 +537,7 @@
   /* library atlas inside a panel; returns { cur(), go(id, scroll) } */
   function library(mount, data, startId) {
     var items = data.items, groups = data.groups || [{ id: 'all', name: L.lib }];
-    var key = 'ecg-lib';
+    var key = 'ecg:pref';
     var pref = H.store.get(key, {});
     var cur = items.filter(function (x) { return x.id === (startId || pref.id); })[0] || items.filter(function (x) { return x.id === pref.id; })[0] || items[0];
     var mode = reduce ? 'paper' : (pref.mode || 'monitor');
@@ -851,8 +858,14 @@
     d.body.appendChild(s);
   }
 
-  var LOGK = 'ecg-cases';
-  function getLog() { var x = H.store.get(LOGK, null); return x && x.r ? x : { r: {}, m: [] }; }
+  /* progress: H.prog('ecg') {best,last,n,at,t,lv,tags,u}; mistakes: H.log app 'ecg' (k 'step', ref = step, d {g, a}).
+     getLog() keeps the pre-v0.4 shape {r, m:[{c,s,g,a,at}]} for the panels below. */
+  var EP = H.prog('ecg'), ECG_SP = B('تخطيط القلب', 'ECG', 'EKG');
+  function getLog() {
+    return { r: EP.all(), m: H.log.list({ app: 'ecg' }).filter(function (e) { return e.d; }).slice(0, 80)
+      .map(function (e) { return { c: e.it, s: e.ref, g: e.d.g, a: e.d.a, at: e.at }; }) };
+  }
+  function clearLog() { EP.clear(); H.log.clear('ecg'); H.store.del('ecg-cases'); }
 
   /* cases panel; returns { go(set, n), hash() } */
   function casesTab(panel, lib, start) {
@@ -865,7 +878,19 @@
     injectCs();
     withCases(function (x) {
       if (!x || !x.cases) { panel.innerHTML = '<p class="ecg-hint">' + H.bi(CL.unavailable) + '</p>'; return; }
-      api.data = x; open();
+      api.data = x;
+      /* pre-v0.4 'ecg-cases' {r, m} → shared layer (needs the cases data for titles and texts) */
+      H.migrate('ecg-v04', function () {
+        var old = H.store.get('ecg-cases', null); if (!old || !old.r) return;
+        var byC = {}; x.cases.forEach(function (k) { byC[k.id] = k; });
+        Object.keys(old.r).forEach(function (id) {
+          var r = old.r[id], c = byC[id]; if (!c) return;
+          var inf = cInfo(c); EP.set(id, { best: r.best || 0, last: r.last != null ? r.last : r.best, n: r.n || 1, t: inf.t, lv: inf.lv, tags: inf.tags, u: inf.u });
+        });
+        var per = {}; (old.m || []).forEach(function (m) { if (byC[m.c]) (per[m.c] = per[m.c] || []).push(m); });
+        Object.keys(per).forEach(function (id) { H.log.put('ecg', id, per[id].map(mEntry), cInfo(byC[id])); });
+      });
+      open();
     });
 
     function setOf(id) { return api.data.sets.filter(function (s) { return String(s.id) === String(id); })[0]; }
@@ -886,6 +911,15 @@
       if (step === 'dx') { var it = byId[v]; return it ? (it.short || it.name) : v; }
       var o = (OPT[step] || []).filter(function (x) { return x[0] === v; })[0]; return o ? o[1] : v;
     }
+    function cInfo(c) {
+      var dx = c.ans ? c.ans.dx : (E.derive(c.strip, c.seed || SEED0, CASE_SEC) || {}).dx, it = byId[dx || ''], tags = c.tags || (it && it.tags) || [];
+      return { t: caseName(c), sp: ECG_SP, lv: c.level || 0, tags: tags.map(H.slug).filter(Boolean), u: H.path() + '#' + hashFor({ set: c.set, n: c.n }) };
+    }
+    function mText(s, g, a) {
+      return T(B('{s}: اخترت «{g}»، والصحيح «{a}»', '{s}: you chose “{g}”; correct: “{a}”', '{s}: seçiminiz “{g}”; doğrusu “{a}”'),
+        { s: s === 'dx' ? CL.dx : L[s], g: optLabel(s, g), a: optLabel(s, a) });
+    }
+    function mEntry(m) { return { k: 'step', ref: m.s, x: mText(m.s, m.g, m.a), d: { g: m.g, a: m.a } }; }
     function caseName(c) { return T(B('{s} {a} · {c} {b}', '{s} {a} · {c} {b}', '{s} {a} · {c} {b}'), { s: CL.setN, a: c.set, c: CL.caseN, b: c.n }); }
 
     /* ---------- list of sets + mistakes log ---------- */
@@ -912,8 +946,7 @@
         if (!log.m.length) { body.innerHTML = '<p class="ecg-hint" style="border:0;padding:0">' + H.bi(CL.noMist) + '</p>'; return; }
         body.innerHTML = '<ul class="ecg-mist">' + log.m.map(function (x, i) {
           var c = api.data.cases.filter(function (k) { return k.id === x.c; })[0]; if (!c) return '';
-          return '<li><b>' + H.bi(caseName(c)) + '</b> — ' + H.bi(T(B('{s}: اخترت «{g}»، والصحيح «{a}»', '{s}: you chose “{g}”; correct: “{a}”', '{s}: seçiminiz “{g}”; doğrusu “{a}”'),
-            { s: x.s === 'dx' ? CL.dx : L[x.s], g: optLabel(x.s, x.g), a: optLabel(x.s, x.a) })) +
+          return '<li><b>' + H.bi(caseName(c)) + '</b> — ' + H.bi(mText(x.s, x.g, x.a)) +
             '<button type="button" class="hw-btn" data-i="' + i + '">' + H.bi(CL.open) + '</button></li>';
         }).join('') + '</ul><div class="ecg-acts"><button type="button" class="hw-btn js-clr">' + H.icon('x') + H.bi(CL.clear) + '</button></div>';
         body.querySelectorAll('button[data-i]').forEach(function (b) {
@@ -922,7 +955,7 @@
         body.querySelector('.js-clr').addEventListener('click', function () {
           H.modal({ icon: 'alert', title: CL.clear, body: '<p>' + H.bi(CL.clearQ) + '</p>', actions: [
             { label: CL.cancel },
-            { label: CL.del, kind: 'danger', onClick: function (close) { H.store.del(LOGK); close(); showList(); } }] });
+            { label: CL.del, kind: 'danger', onClick: function (close) { clearLog(); close(); showList(); } }] });
         });
       } }], { soft: true });
       acc.m.count(log.m.length ? '<span class="hw-lvl lv-3">' + log.m.length + '</span>' : '');
@@ -998,12 +1031,10 @@
         var pts = 0, max = 0, wrong = [];
         steps.forEach(function (s) { max += PTS[s]; if (got[s] === ans[s]) pts += PTS[s]; else wrong.push(s); });
         var score = max ? Math.round(pts / max * 100) : 0;
-        /* log: best/last score per case; the mistakes list keeps this attempt's errors for the case */
-        var log = getLog(), r = log.r[c.id] || { best: 0, n: 0 };
-        r.best = Math.max(r.best || 0, score); r.last = score; r.n = (r.n || 0) + 1; r.at = Date.now(); log.r[c.id] = r;
-        log.m = log.m.filter(function (x) { return x.c !== c.id; });
-        log.m = wrong.map(function (s) { return { c: c.id, s: s, g: got[s], a: ans[s], at: Date.now() }; }).concat(log.m).slice(0, 80);
-        H.store.set(LOGK, log);
+        /* progress: best/last per case; mistakes: this attempt's errors replace the case's previous ones */
+        var inf = cInfo(c);
+        EP.score(c.id, score, { t: inf.t, lv: inf.lv, tags: inf.tags, u: inf.u });
+        H.log.put('ecg', c.id, wrong.map(function (s) { return mEntry({ s: s, g: got[s], a: ans[s] }); }), inf);
         paintDots(); dots.forEach(function (el) { el.classList.remove('cur'); });
         var f = (item && item.f) || {};
         qBox.innerHTML = '<h3>' + H.bi(CL.result) + '</h3>' +
@@ -1170,7 +1201,7 @@
   }
   E.calipers = calipers;
 
-  var TRK = 'ecg-train';
+  var TRK = 'ecg:train';
   function trainTab(panel, lib, start) {
     var items = lib.items, groups = lib.groups, byId = {}; items.forEach(function (x) { byId[x.id] = x; });
     var st = H.store.get(TRK, null); if (!st || !st.s) st = { g: null, s: {}, best: 0 };

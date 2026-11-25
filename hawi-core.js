@@ -1,8 +1,8 @@
-/*! Core: i18n helpers (ar/en/tr), tabs engine, accordion, modal, storage, related posts | v0.3 */
+/*! Core: i18n helpers (ar/en/tr), tabs engine, accordion, modal, storage (progress + mistakes log), related posts | v0.4 */
 (function (w, d) {
   'use strict';
   var H = w.Hawi = w.Hawi || {};
-  H.version = '0.3.0';
+  H.version = '0.4.0';
   H.apps = H.apps || {};
 
   /* ---------- text & i18n ---------- */
@@ -59,11 +59,109 @@
     return JSON.parse(new TextDecoder().decode(mixBytes(bytes)));
   };
 
-  /* ---------- storage (safe) ---------- */
+  /* ---------- storage (safe) ----------
+     One storage layer for every app, so accounts (Firebase) can plug in later without touching the apps.
+     Keys: hawi:<app>:prog (progress) · hawi:<app>:log (mistakes) · hawi:<app>:<other> (synced data)
+           hawi:<app>:pref (this device only) · hawi:meta (version, device id).
+     Every write fires window event 'hawi:store' {key, sync}; a future sync layer listens to it
+     (and batches writes) — apps never talk to the server directly. */
+  function emit(k) {
+    try { w.dispatchEvent(new CustomEvent('hawi:store', { detail: { key: k, sync: H.store.sync(k) } })); } catch (e) {}
+  }
   H.store = {
     get: function (k, def) { try { var v = localStorage.getItem('hawi:' + k); return v ? JSON.parse(v) : def; } catch (e) { return def; } },
-    set: function (k, v) { try { localStorage.setItem('hawi:' + k, JSON.stringify(v)); } catch (e) {} },
-    del: function (k) { try { localStorage.removeItem('hawi:' + k); } catch (e) {} }
+    set: function (k, v) { try { localStorage.setItem('hawi:' + k, JSON.stringify(v)); } catch (e) {} emit(k); },
+    del: function (k) { try { localStorage.removeItem('hawi:' + k); } catch (e) {} emit(k); },
+    /* keys (without 'hawi:') that start with a prefix */
+    keys: function (pre) {
+      var out = [];
+      try { for (var i = 0; i < localStorage.length; i++) { var k = localStorage.key(i); if (k && k.indexOf('hawi:' + (pre || '')) === 0) out.push(k.slice(5)); } } catch (e) {}
+      return out;
+    },
+    /* goes to the account? only <app>:prog|log|train|data — device prefs, meta and pre-v0.4 keys stay local */
+    sync: function (k) { return /^[a-z0-9-]+:(prog|log|train|data)$/.test(k); }
+  };
+  /* meta: data version + random device id (to tell devices apart when merging) */
+  H.meta = function () {
+    var m = H.store.get('meta', null);
+    if (!m || !m.dev) {
+      m = m || {};
+      m.v = 2; m.dev = 'd' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8); m.mig = m.mig || {};
+      H.store.set('meta', m);
+    }
+    return m;
+  };
+  /* run an app's one-time migration (fn) once per device; old keys are kept (removed in a later version) */
+  H.migrate = function (name, fn) {
+    var m = H.meta(); if (m.mig && m.mig[name]) return;
+    try { fn(); } catch (e) { return; }
+    m = H.meta(); m.mig = m.mig || {}; m.mig[name] = Date.now(); H.store.set('meta', m);
+  };
+  H.path = function () { return location.pathname; };
+
+  /* progress per item: H.prog(app) -> { get(id), set(id, rec), score(id, score, extra), all(), del(id), clear() }
+     record: { best, last, n, at, ...app fields } ; merge rule later: best/n = max, the rest from the newest 'at' */
+  H.prog = function (app) {
+    var K = app + ':prog';
+    function load() { var x = H.store.get(K, null); return x && x.r ? x : { v: 1, r: {} }; }
+    return {
+      get: function (id) { return load().r[id] || null; },
+      all: function () { return load().r; },
+      set: function (id, rec) { var x = load(); rec.at = Date.now(); x.r[id] = rec; H.store.set(K, x); return rec; },
+      score: function (id, score, extra) {
+        var x = load(), r = x.r[id] || { best: null, n: 0 };
+        r.best = r.best == null ? score : Math.max(r.best, score); r.last = score; r.n = (r.n || 0) + 1; r.at = Date.now();
+        if (extra) for (var k in extra) r[k] = extra[k];
+        x.r[id] = r; H.store.set(K, x); return r;
+      },
+      del: function (id) { var x = load(); delete x.r[id]; H.store.set(K, x); },
+      clear: function () { H.store.del(K); }
+    };
+  };
+
+  /* mistakes log, one shape for every app (the general log reads them all):
+     entry { id:'app:item:ref', app, it, k:'miss'|'bad'|'step', ref, x:{ar,en,tr} short text, t:{..} item title,
+             tags:[], sp, lv, u: path (+#hash) to retry, c: times repeated, at, d: app data }
+     H.log.put(app, item, mistakes[{k, ref, x, d}], info{t, tags, sp, lv, u}) keeps the LAST attempt only:
+     mistakes no longer made are removed, repeated ones get c+1. Max H.log.MAX per app (oldest dropped). */
+  H.log = {
+    MAX: 2000,
+    APPS: ['case', 'ecg'],
+    _load: function (app) { var x = H.store.get(app + ':log', null); return x && x.e ? x : { v: 1, e: {} }; },
+    put: function (app, item, list, info) {
+      var x = H.log._load(app), now = Date.now(), keep = {};
+      info = info || {};
+      (list || []).forEach(function (m) {
+        var id = app + ':' + item + ':' + m.ref, old = x.e[id];
+        keep[id] = 1;
+        x.e[id] = {
+          id: id, app: app, it: item, k: m.k || 'miss', ref: String(m.ref), x: m.x || null, t: info.t || null,
+          tags: (info.tags || []).slice(0, 8), sp: info.sp || null, lv: info.lv || 0, u: info.u || H.path(),
+          c: old ? (old.c || 1) + 1 : 1, at: now, d: m.d || null
+        };
+      });
+      Object.keys(x.e).forEach(function (id) { if (x.e[id].it === item && !keep[id]) delete x.e[id]; });
+      var ids = Object.keys(x.e);
+      if (ids.length > H.log.MAX) {
+        ids.sort(function (a, b) { return x.e[a].at - x.e[b].at; }).slice(0, ids.length - H.log.MAX).forEach(function (id) { delete x.e[id]; });
+      }
+      H.store.set(app + ':log', x);
+    },
+    /* H.log.list({app, it, tag, sp}) -> entries, newest first */
+    list: function (f) {
+      f = f || {};
+      var apps = f.app ? [f.app] : H.log.APPS, out = [];
+      apps.forEach(function (a) { var e = H.log._load(a).e; Object.keys(e).forEach(function (id) { out.push(e[id]); }); });
+      return out.filter(function (e) {
+        var sp = e.sp && typeof e.sp === 'object' ? e.sp.en : e.sp;
+        return (!f.it || e.it === f.it) && (!f.tag || (e.tags || []).indexOf(f.tag) > -1) && (!f.sp || sp === f.sp);
+      }).sort(function (a, b) { return b.at - a.at; });
+    },
+    count: function (app) { return Object.keys(H.log._load(app).e).length; },
+    clear: function (app, item) {
+      if (!item) { H.store.del(app + ':log'); return; }
+      var x = H.log._load(app); Object.keys(x.e).forEach(function (id) { if (x.e[id].it === item) delete x.e[id]; }); H.store.set(app + ':log', x);
+    }
   };
 
   /* ---------- icons ---------- */
@@ -268,6 +366,25 @@
         return '<li><a href="' + H.esc(x.u) + '">' + H.bi(x.t) + '</a></li>'; }).join('') + '</ul>';
     });
   };
+
+  /* ---------- one-time migrations of pre-v0.4 data (here so any page — even the log page — migrates) ---------- */
+  /* pre-v0.4: hawi:case:<id> {best, attempts, last:{inv,mgmt,score}} + hawi:case-log {id:{u,t,sp,lv,miss[],bad[],at}} */
+  H.migrate('case-v04', function () {
+    var old = H.store.get('case-log', {}) || {}, ids = {};
+    H.store.keys('case:').forEach(function (k) { var id = k.slice(5); if (id && !/^preview-/.test(id) && !/^(prog|log)$/.test(id)) ids[id] = 1; });
+    Object.keys(old).forEach(function (id) { ids[id] = 1; });
+    Object.keys(ids).forEach(function (id) {
+      var sv = H.store.get('case:' + id, null) || {}, lg = old[id] || {}, at = lg.at || Date.now(), u = H.path();
+      try { if (lg.u) u = new URL(lg.u, location.href).pathname; } catch (e) {}
+      if (sv.best == null && lg.best == null) return;
+      var x = { best: sv.best != null ? sv.best : lg.best, n: sv.attempts || lg.n || 1, last: sv.last ? sv.last.score : lg.last,
+        ans: sv.last ? { inv: sv.last.inv || [], mgmt: sv.last.mgmt || [] } : null, t: lg.t || id, sp: lg.sp || null, lv: lg.lv || 0, u: u };
+      H.prog('case').set(id, x);
+      var list = (lg.miss || []).map(function (t, i) { return { k: 'miss', ref: 'old-m' + i, x: t }; })
+        .concat((lg.bad || []).map(function (t, i) { return { k: 'bad', ref: 'old-b' + i, x: t }; }));
+      if (list.length) H.log.put('case', id, list, { t: x.t, sp: x.sp, lv: x.lv, u: u });
+    });
+  });
 
   /* ---------- auto-init: <div data-hawi-app="case" data-src="json-id"> ---------- */
   H.boot = function (scope) {
