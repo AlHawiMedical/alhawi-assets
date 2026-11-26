@@ -1,12 +1,12 @@
 /*! © 2026 Dr. Hassan Alduvayhi — All rights reserved. Unauthorized copying or reuse is prohibited.
     Accounts: header sign-in icon (every page), sign-in window (Google + email, ar/en/tr),
-    sync of progress + mistakes log with the account (Firestore) | v0.1.0 | uses hawi-core.js v0.4 (loaded on demand)
+    sync of progress + mistakes log with the account (Firestore) | v0.1.1 | uses hawi-core.js v0.4 (loaded on demand)
     Data: users/{uid} {name,email,photo,seen} (tier* is read, never written here) ·
           users/{uid}/apps/{app} {prog,log,train,data: JSON text, at, dev} — one document per app. */
 (function (w, d) {
   'use strict';
   if (w.HawiAcct) return;
-  var A = w.HawiAcct = { version: '0.1.0' };
+  var A = w.HawiAcct = { version: '0.1.1' };
 
   /* ---------- settings ---------- */
   var CFG = {
@@ -59,6 +59,8 @@
     pending: { ar: 'سيُحفظ تقدّمك الجديد في حسابك بعد لحظات.', en: 'Your new progress will be saved to your account in a moment.', tr: 'Yeni ilerlemeniz birazdan hesabınıza kaydedilecek.' },
     syncErr: { ar: 'تعذّر الحفظ في الحساب الآن، وسنحاول مرة أخرى. تقدّمك محفوظ على هذا الجهاز.', en: 'Could not save to your account right now; we will try again. Your progress is safe on this device.', tr: 'Şu anda hesaba kaydedilemedi; tekrar deneyeceğiz. İlerlemeniz bu cihazda güvende.' },
     local: { ar: 'بعد الخروج يبقى تقدّمك على هذا الجهاز أيضاً.', en: 'After signing out, your progress also stays on this device.', tr: 'Çıkış yaptıktan sonra ilerlemeniz bu cihazda da kalır.' },
+    welcome: { ar: 'تم تسجيل الدخول. تقدّمك يُحفظ في حسابك.', en: 'Signed in. Your progress is saved to your account.', tr: 'Giriş yapıldı. İlerlemeniz hesabınıza kaydediliyor.' },
+    bye: { ar: 'تم تسجيل الخروج.', en: 'Signed out.', tr: 'Çıkış yapıldı.' },
     wait: { ar: 'لحظة…', en: 'One moment…', tr: 'Bir saniye…' },
     loadErr: { ar: 'تعذّر الاتصال. تحقّق من الإنترنت ثم حاول مرة أخرى.', en: 'Could not connect. Check your internet and try again.', tr: 'Bağlanılamadı. İnternetinizi kontrol edip tekrar deneyin.' },
     e_generic: { ar: 'حدث خطأ، حاول مرة أخرى.', en: 'Something went wrong, please try again.', tr: 'Bir hata oluştu, lütfen tekrar deneyin.' },
@@ -318,7 +320,12 @@
   var SVG = '<svg class="line" viewBox="0 0 24 24"><path class="c" d="M12 12C14.7614 12 17 9.76142 17 7C17 4.23858 14.7614 2 12 2C9.23858 2 7 4.23858 7 7C7 9.76142 9.23858 12 12 12Z"></path><path d="M20.5899 22C20.5899 18.13 16.7399 15 11.9999 15C7.25991 15 3.40991 18.13 3.40991 22"></path></svg>';
   var GSVG = '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" class="hwA-gl"><path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.5h6.5a5.6 5.6 0 0 1-2.4 3.6v3h3.9c2.2-2.1 3.5-5.1 3.5-8.8z"/><path fill="#34A853" d="M12 24c3.2 0 6-1.1 8-2.9l-3.9-3c-1.1.7-2.5 1.2-4.1 1.2-3.1 0-5.8-2.1-6.7-5H1.3v3.1A12 12 0 0 0 12 24z"/><path fill="#FBBC05" d="M5.3 14.3a7.2 7.2 0 0 1 0-4.6V6.6h-4a12 12 0 0 0 0 10.8l4-3.1z"/><path fill="#EA4335" d="M12 4.8c1.8 0 3.3.6 4.6 1.8l3.4-3.4A12 12 0 0 0 1.3 6.6l4 3.1c.9-2.9 3.6-4.9 6.7-4.9z"/></svg>';
   var CSS = '' +
+    '.headIc .isPrf{display:none!important}' +
     '.isAcct [hidden]{display:none!important}' +
+    '.hw-modal-x{display:inline-flex!important;align-items:center;justify-content:center;padding:0!important;line-height:1!important;flex-shrink:0}' +
+    '.hw-modal-x svg{width:16px;height:16px;display:block}' +
+    '.hwA-toast{position:fixed;inset-inline:16px;bottom:24px;z-index:10000;margin:0 auto;max-width:420px;padding:12px 16px;border-radius:12px;background:#10242e;color:#fff;font-size:15px;line-height:1.6;text-align:center;box-shadow:0 10px 30px rgba(0,0,0,.25);opacity:0;transform:translateY(8px);transition:opacity .2s,transform .2s;pointer-events:none}' +
+    '.hwA-toast.on{opacity:1;transform:none}' +
     '.isAcct .hwAcct{background:none;border:0;padding:0;margin:0;color:inherit;font:inherit}' +
     '.isAcct .hwAv{width:26px;height:26px;border-radius:50%;overflow:hidden;display:inline-flex;align-items:center;justify-content:center;background:var(--linkB,#0c9784);color:#fff;font-weight:700;font-size:13px;line-height:1}' +
     '.isAcct .hwAv img{width:100%;height:100%;object-fit:cover;display:block}' +
@@ -385,13 +392,27 @@
   A.paint = paint;
 
   /* ---------- window ---------- */
-  var box = null;
+  var box = null, shut = null, toastT = 0;
+  /* close the window (after signing in or out) and say what happened */
+  function done(key) {
+    if (box && d.body.contains(box) && shut) shut();
+    box = null; shut = null;
+    style();
+    var t = d.querySelector('.hwA-toast');
+    if (!t) { t = d.createElement('div'); t.className = 'hwA-toast'; t.setAttribute('role', 'status'); d.body.appendChild(t); }
+    t.innerHTML = bi(T[key]); clearTimeout(toastT);
+    requestAnimationFrame(function () { t.classList.add('on'); });
+    toastT = setTimeout(function () { t.classList.remove('on'); }, 3500);
+  }
+  A.done = done;
   function open() {
     core(function (H) {
       style();
       if (box && d.body.contains(box)) return;
-      H.modal({ title: T.title, body: '<div class="hwA"><p class="hwA-why">' + bi(T.wait) + '</p></div>' });
-      var ms = d.querySelectorAll('.hw-modal'); box = ms[ms.length - 1].querySelector('.hwA');
+      shut = H.modal({ title: T.title, body: '<div class="hwA"><p class="hwA-why">' + bi(T.wait) + '</p></div>' });
+      var ms = d.querySelectorAll('.hw-modal'), mod = ms[ms.length - 1], x = mod.querySelector('.hw-modal-x');
+      box = mod.querySelector('.hwA');
+      if (x) x.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>';
       box.addEventListener('click', act);
       box.addEventListener('submit', function (e) { e.preventDefault(); act({ target: box.querySelector('[data-a="in"]') }); });
       render();
@@ -463,7 +484,7 @@
     if (a === 'google') {
       var gp = new F.a.GoogleAuthProvider(); gp.setCustomParameters && gp.setCustomParameters({ prompt: 'select_account' });
       busy(true);
-      F.a.signInWithPopup(F.auth, gp).then(function () { busy(false); }, function (err) {
+      F.a.signInWithPopup(F.auth, gp).then(function () { busy(false); if (isVerified(F.auth.currentUser)) done('welcome'); }, function (err) {
         busy(false);
         if (err && (err.code === 'auth/popup-blocked' || err.code === 'auth/operation-not-supported-in-this-environment')) {
           try { sessionStorage.setItem(RKEY, '1'); } catch (x) {}
@@ -473,7 +494,7 @@
       });
     } else if (a === 'in' || a === 'up') {
       if (!email || !pass) { msg('needBoth', true); return; }
-      if (a === 'in') run(F.a.signInWithEmailAndPassword(F.auth, email, pass));
+      if (a === 'in') run(F.a.signInWithEmailAndPassword(F.auth, email, pass), function () { if (isVerified(F.auth.currentUser)) done('welcome'); });
       else run(F.a.createUserWithEmailAndPassword(F.auth, email, pass).then(function (c) { return sendVerify(F, c.user); }), function () { msg('sent'); });
     } else if (a === 'reset') {
       if (!email) { msg('needEmail', true); if (em) em.focus(); return; }
@@ -485,11 +506,11 @@
       /* reload the user, then refresh the token so the database sees email_verified */
       run(F.a.reload(cu).then(function () { return cu.getIdToken(true); }), function () {
         var u2 = F.auth.currentUser;
-        if (isVerified(u2)) onUser(F, u2); else msg('notYet', true);
+        if (isVerified(u2)) { onUser(F, u2); done('welcome'); } else msg('notYet', true);
       });
     } else if (a === 'out') {
       busy(true);
-      S.flush().catch(function () {}).then(function () { return F.a.signOut(F.auth); }).then(function () { busy(false); }, function (err) { busy(false); fail(err); });
+      S.flush().catch(function () {}).then(function () { return F.a.signOut(F.auth); }).then(function () { busy(false); done('bye'); }, function (err) { busy(false); fail(err); });
     }
   }
 
