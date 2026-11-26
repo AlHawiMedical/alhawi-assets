@@ -1,12 +1,13 @@
 /*! © 2026 Dr. Hassan Alduvayhi — All rights reserved. Unauthorized copying or reuse is prohibited.
     Accounts: header sign-in icon (every page), sign-in window (Google + email, ar/en/tr),
-    sync of progress + mistakes log with the account (Firestore) | v0.1.2 | uses hawi-core.js v0.4 (loaded on demand)
+    sync of progress + mistakes log with the account (Firestore) | v0.1.3 | uses hawi-core.js v0.4 (loaded on demand)
+    v0.1.3: SHAM Cards icon in the header (every page) with the number of cards to review today
     Data: users/{uid} {name,email,photo,seen} (tier* is read, never written here) ·
           users/{uid}/apps/{app} {prog,log,train,data: JSON text, at, dev} — one document per app. */
 (function (w, d) {
   'use strict';
   if (w.HawiAcct) return;
-  var A = w.HawiAcct = { version: '0.1.2' };
+  var A = w.HawiAcct = { version: '0.1.3' };
 
   /* ---------- settings ---------- */
   var CFG = {
@@ -516,9 +517,58 @@
     }
   }
 
+  /* ---------- SHAM Cards icon (every page): link to the cards page + how many cards wait today ----------
+     Reads the saved cards directly (no core needed), with the same rules as the review queue in hawi-cards.js:
+     learning due now + reviews due before 4 am + new cards up to the daily limit. */
+  var CARDS_URL = '/p/cards.html', MIN = 60000;
+  var CSVG = '<svg class="line" viewBox="0 0 24 24"><rect x="3" y="7" width="13" height="14" rx="2.5"></rect><path class="c" d="M8 3.5h9.5A3.5 3.5 0 0 1 21 7v9.5"></path></svg>';
+  var CT = { ar: 'بطاقات شام', en: 'SHAM Cards', tr: 'SHAM Kartları' };
+  var CDUE = { ar: 'للمراجعة اليوم', en: 'to review today', tr: 'bugün tekrar' };
+  var CCSS = '.isCards .hwCards{position:relative;display:inline-flex;align-items:center;justify-content:center;color:inherit}' +
+    '.isCards .hwCn{position:absolute;top:-6px;inset-inline-end:-8px;min-width:17px;height:17px;padding:0 4px;box-sizing:border-box;border-radius:9px;background:var(--linkB,#0c9784);color:#fff;font:700 10.5px/17px system-ui,sans-serif;text-align:center;box-shadow:0 0 0 2px var(--headerB,#fff)}' +
+    '.isCards .hwCn[hidden]{display:none!important}';
+  function rd(k) { try { var v = localStorage.getItem('hawi:' + k); return v ? JSON.parse(v) : null; } catch (e) { return null; } }
+  function dEnd(t) { var x = new Date(t); if (x.getHours() >= 4) x.setDate(x.getDate() + 1); x.setHours(4, 0, 0, 0); return +x; }
+  function dKey(t) { var x = new Date(t - 4 * 3600000); return x.getFullYear() + '-' + ('0' + (x.getMonth() + 1)).slice(-2) + '-' + ('0' + x.getDate()).slice(-2); }
+  function dueCount() {
+    var all = (rd('cards:prog') || {}).r || {}, now = Date.now(), end = dEnd(now), n = 0, fresh = 0;
+    Object.keys(all).forEach(function (k) {
+      var r = all[k]; if (!r || r.x) return;
+      if (!r.st) fresh++; else if (r.st === 2 ? r.due < end : r.due <= now + 20 * MIN) n++;
+    });
+    var pf = rd('cards:pref') || {}, per = pf.perDay > 0 ? +pf.perDay : 20;
+    var seen = (((rd('cards:train') || {}).s || {})['n:' + dKey(now)] || [0])[0] || 0;
+    return n + Math.min(fresh, Math.max(0, per - seen));
+  }
+  function cardsIcon() {
+    var ul = d.querySelector('.headIc');
+    if (!ul || ul.querySelector('.isCards')) return;
+    if (!d.getElementById('hwCardsCss')) { var s = d.createElement('style'); s.id = 'hwCardsCss'; s.textContent = CCSS; (d.head || d.documentElement).appendChild(s); }
+    var li = d.createElement('li'); li.className = 'isCards';
+    li.innerHTML = '<a class="tIc hwCards" href="' + CARDS_URL + '">' + CSVG + '<span class="hwCn" hidden></span></a>';
+    ul.insertBefore(li, ul.querySelector('.isAcct') || ul.querySelector('.isLang'));
+    cardsPaint();
+  }
+  var cpT = 0;
+  function cardsPaint() {
+    var li = d.querySelector('.isCards'); if (!li) return;
+    var a = li.querySelector('a'), c = li.querySelector('.hwCn'), n = dueCount(), l = lang();
+    c.hidden = !n; c.textContent = n > 99 ? '99+' : String(n);
+    a.setAttribute('aria-label', CT[l] + (n ? ' — ' + n + ' ' + CDUE[l] : ''));
+    a.title = a.getAttribute('aria-label');
+  }
+  A.cardsPaint = cardsPaint;
+  function cardsLater() { clearTimeout(cpT); cpT = setTimeout(cardsPaint, 300); }
+  w.addEventListener('hawi:store', function (e) { if (/^cards(z)?:/.test(e.detail && e.detail.key || '')) cardsLater(); });
+  w.addEventListener('storage', function (e) { if (!e.key || /^hawi:cards/.test(e.key)) cardsLater(); });
+  w.addEventListener('hawi:lang', cardsPaint);
+  d.addEventListener('visibilitychange', function () { if (d.visibilityState === 'visible') cardsPaint(); });
+  setInterval(cardsPaint, 5 * MIN);
+
   /* ---------- boot ---------- */
   function boot() {
     icon();
+    cardsIcon();
     var c = cache(), redirect = false;
     try { redirect = !!sessionStorage.getItem(RKEY); } catch (e) {}
     /* signed in: sync where the student actually works (apps, mistakes log) — other pages only show the avatar */
