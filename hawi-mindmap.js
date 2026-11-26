@@ -1,6 +1,6 @@
 /*! © 2026 Dr. Hassan Alduvayhi — All rights reserved. Unauthorized copying or reuse is prohibited.
     Mind maps: collapsible tree (map + list views), touch pan / pinch zoom, RTL mirroring, notes with [[…]] tooltips,
-    related content by tag, favourites | v0.1.0 (ar/en/tr) | requires hawi-core.js v0.5
+    related content by tag, favourites | v0.1.1 (ar/en/tr) | requires hawi-core.js v0.5
     Post: <div data-hawi-app="mindmap"><script type="text/hawi">HW1.…</script></div>
     Data: { v:1, id, sp:{ar,en,tr}, t:{ar,en,tr}, root: NODE }
           NODE { n:{ar,en,tr} name, note?:{ar,en,tr} (supports **bold** and [[…]]), tag?: blogger label (related content),
@@ -50,7 +50,7 @@
     '.hw-mm-vp{position:relative;height:min(62vh,560px);min-height:340px;overflow:hidden;border:1px solid var(--hw-line);border-radius:var(--hw-radius);background:var(--hw-bg-soft);touch-action:none;cursor:grab;user-select:none;-webkit-user-select:none}' +
     '.hw-mm-vp.is-drag{cursor:grabbing}' +
     '.hw-mm-st{position:absolute;left:0;top:0;transform-origin:0 0;will-change:transform}' +
-    '.hw-mm-st.is-anim{transition:transform .25s ease}.hw-mm-links{position:absolute;left:0;top:0;overflow:visible;pointer-events:none}' +
+    '.hw-mm-st.is-anim{transition:transform .25s ease}.hw-mm-links{position:absolute;left:0;top:0;max-width:none!important;overflow:visible;pointer-events:none}' +
     '.hw-mm-links path{stroke:color-mix(in srgb,var(--hw-accent) 55%,var(--hw-line));stroke-width:2;stroke-linecap:round}' +
     '.hw-mm-n{position:absolute;left:0;top:0;display:inline-flex;align-items:center;gap:7px;width:max-content;max-width:230px;padding:6px 11px 6px 8px;border:1.5px solid transparent;border-radius:11px;background:none;color:var(--hw-ink);font:inherit;font-size:14px;font-weight:600;line-height:1.35;text-align:start;white-space:normal;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:background .15s,border-color .15s}' +
     '[dir=rtl] .hw-mm-n,.hw-mm-n:dir(rtl){padding:6px 8px 6px 11px}' +
@@ -188,7 +188,7 @@
           var b = box[x.id]; b.x = R ? W - colX[x.dep] - b.w : colX[x.dep]; b.y = b.cy - b.h / 2;
           els[x.id].style.transform = 'translate(' + b.x + 'px,' + b.y + 'px)';
         });
-        svg.setAttribute('width', W); svg.setAttribute('height', Ht); svg.setAttribute('viewBox', '0 0 ' + W + ' ' + Ht);
+        svg.setAttribute('width', W); svg.setAttribute('height', Ht); svg.style.width = W + 'px'; svg.style.height = Ht + 'px'; /* Plus UI: svg{width:var(--svgW)} beats the attributes */ svg.setAttribute('viewBox', '0 0 ' + W + ' ' + Ht);
         var dd = '';
         vis.forEach(function (x) {
           if (!open[x.id]) return; var a = box[x.id];
