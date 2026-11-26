@@ -1,12 +1,12 @@
 /*! © 2026 Dr. Hassan Alduvayhi — All rights reserved. Unauthorized copying or reuse is prohibited.
     Accounts: header sign-in icon (every page), sign-in window (Google + email, ar/en/tr),
-    sync of progress + mistakes log with the account (Firestore) | v0.1.1 | uses hawi-core.js v0.4 (loaded on demand)
+    sync of progress + mistakes log with the account (Firestore) | v0.1.2 | uses hawi-core.js v0.4 (loaded on demand)
     Data: users/{uid} {name,email,photo,seen} (tier* is read, never written here) ·
           users/{uid}/apps/{app} {prog,log,train,data: JSON text, at, dev} — one document per app. */
 (function (w, d) {
   'use strict';
   if (w.HawiAcct) return;
-  var A = w.HawiAcct = { version: '0.1.1' };
+  var A = w.HawiAcct = { version: '0.1.2' };
 
   /* ---------- settings ---------- */
   var CFG = {
@@ -103,6 +103,8 @@
   function clone(o) { return o == null ? o : JSON.parse(JSON.stringify(o)); }
   function parse(s) { if (s == null) return null; if (typeof s !== 'string') return s; try { return JSON.parse(s); } catch (e) { return null; } }
   function same(a, b) { return JSON.stringify(a) === JSON.stringify(b); }
+  /* Firestore counts UTF-8 bytes (Arabic letters are 2 bytes): measure bytes, not characters */
+  function bytes(t) { try { return new TextEncoder().encode(t).length; } catch (e) { return t.length * 2; } }
 
   /* ---------- merge (nothing is lost) ----------
      prog: per item best/n = the larger, everything else from the newer 'at'
@@ -283,7 +285,7 @@
     },
     doc: function (app) {
       var H = w.Hawi, x = { at: Date.now(), dev: H.meta && H.meta().dev || '' }, size = 0;
-      KINDS.forEach(function (k) { var v = H.store.get(app + ':' + k, null); if (v != null) { x[k] = JSON.stringify(v); size += x[k].length; } });
+      KINDS.forEach(function (k) { var v = H.store.get(app + ':' + k, null); if (v != null) { x[k] = JSON.stringify(v); size += bytes(x[k]); } });
       return size > MAXDOC ? null : x;
     },
     push: function (apps) {

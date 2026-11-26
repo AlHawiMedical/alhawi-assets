@@ -1,9 +1,10 @@
 /*! Core: i18n helpers (ar/en/tr), tabs engine, accordion, modal, storage (progress + mistakes log), related posts, tab order,
-    tooltip shortcodes [[…]] (loads hawi-tt.js on demand) | v0.4.2 */
+    tooltip shortcodes [[…]] (loads hawi-tt.js on demand), SHAM Cards membership (H.cards) | v0.5.0
+    v0.5: H.cards (add / has / off / due) + every new mistake in H.log becomes a card automatically (any app) */
 (function (w, d) {
   'use strict';
   var H = w.Hawi = w.Hawi || {};
-  H.version = '0.4.2';
+  H.version = '0.5.0';
   /* where this file came from: sibling files (hawi-tt.js, hawi-glossary.json) load from the same folder with the same ?v= */
   (function () {
     var s = d.currentScript && d.currentScript.src || '', m = s.match(/^(.*\/)hawi-core\.js(\?[^#]*)?/);
@@ -156,7 +157,7 @@
     APPS: ['case', 'ecg'],
     _load: function (app) { var x = H.store.get(app + ':log', null); return x && x.e ? x : { v: 1, e: {} }; },
     put: function (app, item, list, info) {
-      var x = H.log._load(app), now = Date.now(), keep = {};
+      var x = H.log._load(app), now = Date.now(), keep = {}, fresh = [];
       info = info || {};
       (list || []).forEach(function (m) {
         var id = app + ':' + item + ':' + m.ref, old = x.e[id];
@@ -166,6 +167,7 @@
           tags: (info.tags || []).slice(0, 8), sp: info.sp || null, lv: info.lv || 0, u: info.u || H.path(),
           c: old ? (old.c || 1) + 1 : 1, at: now, d: m.d || null
         };
+        fresh.push(x.e[id]);
       });
       Object.keys(x.e).forEach(function (id) { if (x.e[id].it === item && !keep[id]) delete x.e[id]; });
       var ids = Object.keys(x.e);
@@ -173,6 +175,7 @@
         ids.sort(function (a, b) { return x.e[a].at - x.e[b].at; }).slice(0, ids.length - H.log.MAX).forEach(function (id) { delete x.e[id]; });
       }
       H.store.set(app + ':log', x);
+      if (fresh.length && H.cards) H.cards.fromLog(fresh);
     },
     /* H.log.list({app, it, tag, sp}) -> entries, newest first */
     list: function (f) {
@@ -188,6 +191,68 @@
     clear: function (app, item) {
       if (!item) { H.store.del(app + ':log'); return; }
       var x = H.log._load(app); Object.keys(x.e).forEach(function (id) { if (x.e[id].it === item) delete x.e[id]; }); H.store.set(app + ':log', x);
+    }
+  };
+
+  /* ---------- SHAM Cards: which cards a student has (the review engine itself is in hawi-cards.js) ----------
+     A card is a reference 'source:key' — gloss:stemi · ecg:af · deck:<deck>:<card> · log:<mistake id> · later qbank:…, ddx:… —
+     so any app (now or future) adds cards with one call: H.cards.add(ref, {how, z}). Its schedule (FSRS) lives in
+     H.prog('cards') = account document apps/cards; the merge keeps the newest review of each card on every device.
+     rec { st: 0 new|1 learning|2 review|3 relearning, s, df, due, lr, n, l, add, how, x: 1 = removed }
+     Mistake cards keep the mistake text (it outlives the log once corrected) in H.prog('cardz') = a second account
+     document, so thousands of mistake cards never push the schedules past Firestore's document size:
+     cardz rec { z: { k, x:{ar,en,tr}, d } } — title and link come from the app's own progress record (H.prog(app)). */
+  function dayEnd(t) { var x = new Date(t || Date.now()); if (x.getHours() >= 4) x.setDate(x.getDate() + 1); x.setHours(4, 0, 0, 0); return +x; }
+  H.cards = {
+    MAXZ: 2500,
+    dayEnd: dayEnd,
+    p: function () { return H.prog('cards'); },
+    pref: function () { var p = H.store.get('cards:pref', null) || {}; return { auto: p.auto !== false, perDay: p.perDay > 0 ? +p.perDay : 20 }; },
+    get: function (ref) { return H.cards.p().get(ref); },
+    has: function (ref) { var r = H.cards.get(ref); return !!(r && !r.x); },
+    /* add (or bring back a removed card with its history); returns the record */
+    add: function (ref, o) {
+      o = o || {}; var P = H.cards.p(), r = P.get(ref);
+      if (o.z) H.prog('cardz').set(ref, { z: o.z });
+      if (r && !r.x) return r;
+      if (r) { delete r.x; return P.set(ref, r); }
+      return P.set(ref, { st: 0, due: Date.now(), n: 0, l: 0, add: Date.now(), how: o.how || 'add' });
+    },
+    z: function (ref) { var r = H.prog('cardz').get(ref); return r && r.z || null; },
+    off: function (ref) { var P = H.cards.p(), r = P.get(ref); if (r && !r.x) { r.x = 1; P.set(ref, r); } },
+    /* due now: learning + reviews due before the day ends (new cards count separately, up to the daily limit) */
+    due: function () {
+      var all = H.cards.p().all(), end = dayEnd(), now = Date.now(), o = { rev: 0, learn: 0, fresh: 0 };
+      Object.keys(all).forEach(function (k) {
+        var r = all[k]; if (!r || r.x) return;
+        if (!r.st) o.fresh++; else if (r.st === 2 ? r.due < end : r.due <= now + 20 * 60000) r.st === 2 ? o.rev++ : o.learn++;
+      });
+      return o;
+    },
+    /* mistakes -> cards (called by H.log.put; works for every app). A repeated or returning mistake is due again now. */
+    fromLog: function (list) {
+      if (!H.cards.pref().auto) return;
+      function load(k) { var x = H.store.get(k, null); return x && x.r ? x : { v: 1, r: {} }; }
+      var x = load('cards:prog'), zs = load('cardz:prog'), now = Date.now(), n = 0;
+      list.forEach(function (e) {
+        var ref = 'log:' + e.id, r = x.r[ref], z = { k: e.k, x: e.x };
+        if (e.d) z.d = e.d;
+        if (r && r.x) return; /* the student removed this card: respect it */
+        if (!r) r = { st: 0, due: now, n: 0, l: 0, add: now, how: 'auto' };
+        else if (r.st) r.due = now;
+        r.at = now; x.r[ref] = r; zs.r[ref] = { z: z, at: now }; n++;
+      });
+      if (!n) return;
+      /* keep the account documents small: past MAXZ mistake texts, the oldest well-learned mistake cards retire
+         (removed like a card the student deleted; mature = review state with stability >= 21 days), then the oldest */
+      var ids = Object.keys(zs.r), over = ids.length - H.cards.MAXZ;
+      if (over > 0) {
+        function mature(k) { var c = x.r[k]; return c && c.st === 2 && c.s >= 21 ? 0 : 1; }
+        ids.sort(function (a, b) { return mature(a) - mature(b) || (zs.r[a].at || 0) - (zs.r[b].at || 0); }).slice(0, over).forEach(function (k) {
+          delete zs.r[k]; if (x.r[k]) { x.r[k].x = 1; x.r[k].at = now; }
+        });
+      }
+      H.store.set('cardz:prog', zs); H.store.set('cards:prog', x);
     }
   };
 

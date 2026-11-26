@@ -1,4 +1,5 @@
-/*! Tooltips + glossary (ar/en/tr) | v0.1.0 | requires hawi-core.js v0.4.2
+/*! Tooltips + glossary (ar/en/tr) | v0.2.0 | requires hawi-core.js v0.4.2 (card button: v0.5)
+    v0.2: glossary tooltips carry "Add to my cards" (SHAM Cards, card gloss:<key>)
     Shortcodes (in app data through H.fmt, or typed in a Blogger post):
       [[STEMI]]                  -> glossary entry found by its name or an alias (any language)
       [[احتشاء القلب|#stemi]]     -> glossary entry by key
@@ -15,8 +16,17 @@
   var L = {
     lesson: B('الدرس', 'Lesson', 'Ders'), lib: B('في مكتبة تخطيط القلب', 'In the ECG library', 'EKG kütüphanesinde'),
     rel: B('مواد ذات صلة', 'Related Content', 'İlgili İçerik'), close: B('إغلاق', 'Close', 'Kapat'),
-    loading: B('جارٍ التحميل…', 'Loading…', 'Yükleniyor…')
+    loading: B('جارٍ التحميل…', 'Loading…', 'Yükleniyor…'),
+    add: B('أضف إلى بطاقاتي', 'Add to my cards', 'Kartlarıma ekle'),
+    inC: B('في بطاقاتي', 'In my cards', 'Kartlarımda')
   };
+  var CARDS = '/p/cards.html';
+  function cardBtn(k) {
+    if (!H.cards) return '';
+    return H.cards.has('gloss:' + k)
+      ? '<a class="hw-ttp-c is-in" href="' + CARDS + '">' + H.icon('check') + T(L.inC) + '</a>'
+      : '<button type="button" class="hw-ttp-c" data-card="' + H.esc(k) + '">' + T(L.add) + '</button>';
+  }
 
   /* ---------- glossary: load once, from the configured source, with fallback ---------- */
   var CFG = w.hawiGloss || {};
@@ -131,7 +141,7 @@
       html = '<b class="hw-ttp-t">' + T(x.n) + '</b><p class="hw-ttp-d">' + H.esc(H.t(x.d)).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>') + '</p>';
       var links = '';
       if (x.lib) links += '<li><a href="/p/ecg-academy.html#library/' + H.esc(x.lib) + '">' + T(L.lib) + '</a></li>';
-      html += '<ul class="hw-ttp-l">' + links + '</ul>';
+      html += '<ul class="hw-ttp-l">' + links + '</ul>' + cardBtn(x.k);
       if (x.les || x.tag) html += '<div class="hw-ttp-r" hidden></div>';
       setTimeout(function () {
         var ul = box.querySelector('.hw-ttp-l'), r = box.querySelector('.hw-ttp-r'); if (!ul || cur !== el) return;
@@ -149,6 +159,12 @@
     }
     box.innerHTML = html + '<button type="button" class="hw-ttp-x" aria-label="' + T(L.close) + '">×</button>';
     box.querySelector('.hw-ttp-x').addEventListener('click', close);
+    var cb = box.querySelector('button.hw-ttp-c');
+    if (cb) cb.addEventListener('click', function (e) {
+      e.stopPropagation(); var k = cb.getAttribute('data-card');
+      H.cards.add('gloss:' + k, { how: 'tt' });
+      cb.outerHTML = cardBtn(k); place(el);
+    });
   }
   function place(el) {
     if (!box || box.hidden) return;
