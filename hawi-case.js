@@ -284,14 +284,20 @@
           (data.vitals || []).map(function (v) { return '<tr><th scope="row">' + bi(v.k) + '</th><td>' + H.esc(v.v) + '</td></tr>'; }).join('') +
         '</tbody></table></section>' +
         '<div class="js-acc"></div>' +
-        '<div class="hw-submit"><button type="button" class="hw-btn hw-btn--primary js-submit">' + icon('bolt') + bi(L.submit) + '</button></div>';
+        /* the submit bar lives inside the choices block (investigations + management) only: being sticky, it shows
+           at the bottom of the screen while the student is among the choices, never over the story, vitals or exam */
+        '<div class="hw-choose"><div class="js-acc2"></div>' +
+        '<div class="hw-submit"><button type="button" class="hw-btn hw-btn--primary js-submit">' + icon('bolt') + bi(L.submit) + '</button></div></div>';
 
       var acc = H.accordion(panel.querySelector('.js-acc'), [
         { id: 'h', title: L.history, html: '<p>' + bi(data.history) + '</p>' },
-        { id: 'e', title: L.exam, html: '<ul>' + (data.exam || []).map(function (x) { return '<li>' + bi(x) + '</li>'; }).join('') + '</ul>' },
+        { id: 'e', title: L.exam, html: '<ul>' + (data.exam || []).map(function (x) { return '<li>' + bi(x) + '</li>'; }).join('') + '</ul>' }
+      ]);
+      var acc2 = H.accordion(panel.querySelector('.js-acc2'), [
         { id: 'i', title: L.inv, render: function (b) { optList(b, 'inv', data.investigations.options); } },
         { id: 'm', title: L.mgmt, render: function (b) { optList(b, 'mgmt', data.management.options); } }
       ]);
+      acc.i = acc2.i; acc.m = acc2.m;
 
       function counts() {
         var ni = Object.keys(st.inv).length, nm = Object.keys(st.mgmt).length;
