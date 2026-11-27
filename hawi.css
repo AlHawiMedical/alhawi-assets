@@ -301,6 +301,8 @@ html[dir=rtl] .js-finish svg{transform:scaleX(-1)}
 }
 /* Play: the choices block (investigations + management + submit) follows the story block with the same gap */
 .hw-choose{margin-top:10px}
+/* "Next Steps" window (Review → Retry): the two choices stacked, full width */
+.hw-modal--stack .hw-modal-acts{flex-direction:column}
 /* option rows are <div> since v0.5 (buttons were border-box by default; themes without a global reset made them taller and wider) */
 .hw-opts .hw-opt{box-sizing:border-box}
 /* touch screens keep :hover after a tap, so a tapped row looked selected; hover colours only where a mouse exists */

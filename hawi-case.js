@@ -71,19 +71,24 @@
     v_rec: B('موصى به', 'Recommended', 'Önerilir'), v_low: B('مردود ضعيف', 'Low Yield', 'Düşük Verim'),
     v_nfl: B('ليس الخيار الأول', 'Not First-Line', 'İlk Basamak Değil'), v_lim: B('دور محدود', 'Limited Role', 'Sınırlı Rol'),
     v_nrn: B('ليس روتينياً الآن', 'Not Routine Now', 'Şu An Rutin Değil'), v_ni: B('غير مستطب', 'Not Indicated', 'Endike Değil'),
-    v_na: B('غير مناسب', 'Not Appropriate', 'Uygun Değil'), v_nr: B('غير موصى به', 'Not Recommended', 'Önerilmez'),
-    v_harm: B('ضار', 'Harmful', 'Zararlı')
+    v_nin: B('غير مستطب الآن', 'Not Indicated Now', 'Şu An Endike Değil'), v_na: B('غير مناسب', 'Not Appropriate', 'Uygun Değil'), v_nr: B('غير موصى به', 'Not Recommended', 'Önerilmez'),
+    v_harm: B('ضار', 'Harmful', 'Zararlı'),
+    nextT: B('الخطوة التالية', 'Next Steps', 'Sonraki Adım'),
+    nextB: B('هل تريد دراسة المناقشة السريرية أولاً، أم إعادة الحالة الآن؟', 'Would you like to study the clinical discussion first, or restart the case now?', 'Önce klinik tartışmayı incelemek mi, yoksa vakayı şimdi yeniden başlatmak mı istersiniz?'),
+    viewDisc: B('عرض المناقشة', 'View Discussion', 'Tartışmayı Gör'),
+    startAgain: B('ابدأ من جديد', 'Start Again', 'Yeniden Başla')
   };
 
   /* verdict code -> colour class; the order also sorts the Review lists (recommended first) */
-  var VERD = { rec: 'ok', low: 'mid', nfl: 'mid', lim: 'mid', nrn: 'mid', ni: 'bad', na: 'bad', nr: 'bad', harm: 'harm' };
-  var VORD = ['rec', 'low', 'nfl', 'lim', 'nrn', 'ni', 'na', 'nr', 'harm'];
+  var VERD = { rec: 'ok', low: 'mid', nfl: 'mid', lim: 'mid', nrn: 'mid', ni: 'bad', nin: 'bad', na: 'bad', nr: 'bad', harm: 'harm' };
+  var VORD = ['rec', 'low', 'nfl', 'lim', 'nrn', 'nin', 'ni', 'na', 'nr', 'harm'];
   function verdict(o) { return VERD[o.v] ? o.v : o.w > 0 ? 'rec' : o.w === 0 ? 'low' : o.w === -1 ? 'ni' : 'harm'; }
   /* age: infants by months when given (patient.months), otherwise years */
   function ageHtml(p) {
     var mo = p && p.months;
     return typeof mo === 'number' && mo >= 0 && (!(p.age > 2)) ? H.esc(mo) + ' ' + bi(L.mos) : H.esc(p && p.age) + ' ' + bi(L.yrs);
   }
+  var CHAT = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4.5h14A1.5 1.5 0 0 1 20.5 6v9a1.5 1.5 0 0 1-1.5 1.5H10l-5 4v-4H5A1.5 1.5 0 0 1 3.5 15V6A1.5 1.5 0 0 1 5 4.5z"/></svg>';
   var EXIT = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h4.5A1.5 1.5 0 0 1 20 5.5v13a1.5 1.5 0 0 1-1.5 1.5H14"/><path d="M10 16l-4-4 4-4M6 12h10"/></svg>';
   var HEART = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20.5s-7.5-4.6-9.3-9.4C1.4 7.6 3.7 4.5 7 4.5c2 0 3.6 1.1 5 3 1.4-1.9 3-3 5-3 3.3 0 5.6 3.1 4.3 6.6-1.8 4.8-9.3 9.4-9.3 9.4z"/></svg>';
   /* favourites: case:data {v, fav:{<post path>:{t, at}}} — the 'data' kind syncs with the account; the hub reads it */
@@ -445,7 +450,14 @@
           '<p><b>' + bi(L.yourResult) + '</b><br>' + bi(L.best) + ': ' + saved.best + ' · ' + bi(L.attempts) + ': ' + saved.attempts + '</p></div></section>' : '') +
         '<div class="js-acc"></div>' +
         '<div class="hw-acts"><button type="button" class="hw-btn hw-btn--primary js-retry">' + icon('redo') + bi(L.retry) + '</button></div>';
-      panel.querySelector('.js-retry').addEventListener('click', retry);
+      /* as in the source app: before restarting from Review, offer the discussion first */
+      panel.querySelector('.js-retry').addEventListener('click', function () {
+        H.modal({ icon: 'redo', title: L.nextT, body: '<p>' + bi(L.nextB) + '</p>', actions: [
+          { label: L.viewDisc, kind: 'primary', onClick: function (c) { c(); tabs.select('discussion', { focus: true }); mount.scrollIntoView({ behavior: 'smooth', block: 'start' }); } },
+          { label: L.startAgain, icon: 'redo', onClick: function (c) { c(); retry(); } }] });
+        var m = d.querySelectorAll('.hw-modal'); m = m[m.length - 1];
+        if (m) { m.classList.add('hw-modal--stack'); var b1 = m.querySelector('.hw-modal-acts .hw-btn--primary'); if (b1) b1.insertAdjacentHTML('afterbegin', CHAT); }
+      });
       var invOpts = data.investigations.options, hasRes = invOpts.some(function (o) { return o.r || (o.media && o.media.src); });
       var mine = invOpts.filter(function (o) { return st.inv[o.id]; });
       H.accordion(panel.querySelector('.js-acc'), (hasRes ? [
