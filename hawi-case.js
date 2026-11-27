@@ -1,4 +1,4 @@
-/*! Clinical Case app (Play / Review / Discussion) | v0.5.0 (ar/en/tr) | requires hawi-core.js v0.4
+/*! Clinical Case app (Play / Review / Discussion) | v0.6.0 (ar/en/tr) | requires hawi-core.js v0.4
     v0.3: investigation results (r) + media, meta (level, tags), discussion links + related posts by tag,
           personal log of mistakes (data-view="progress")
     v0.3.1: no platform name in code; related posts work on any domain
@@ -9,7 +9,8 @@
           Review lists every option numbered with a verdict badge (option v, or derived from w) + Retry;
           Discussion: authored investigation/management bullets (discussion.inv / .mgmt), summary paragraphs,
           "Finish Session" (to the cases hub) instead of "Back to Top" (the theme has its own); favourite heart
-          (stored in case:data → synced with the account) */
+          (stored in case:data → synced with the account)
+    v0.6.0: 47 verdict badge codes (one table VT) + optional per-option label vt {ar,en,tr} for any other source badge */
 (function (w, d) {
   'use strict';
   var H = w.Hawi; if (!H || !H.prog) return; /* needs hawi-core v0.4 */
@@ -67,21 +68,66 @@
     takeHome: B('رسائل للحفظ', 'Key Take-Home Messages', 'Akılda Kalması Gerekenler'),
     finish: B('إنهاء الجلسة', 'Finish Session', 'Oturumu Bitir'),
     favAdd: B('أضف إلى المفضلة', 'Add to favourites', 'Favorilere ekle'), favDel: B('أزل من المفضلة', 'Remove from favourites', 'Favorilerden çıkar'),
-    /* verdict badges (Review): option v, or derived from w */
-    v_rec: B('موصى به', 'Recommended', 'Önerilir'), v_low: B('مردود ضعيف', 'Low Yield', 'Düşük Verim'),
-    v_nfl: B('ليس الخيار الأول', 'Not First-Line', 'İlk Basamak Değil'), v_lim: B('دور محدود', 'Limited Role', 'Sınırlı Rol'),
-    v_nrn: B('ليس روتينياً الآن', 'Not Routine Now', 'Şu An Rutin Değil'), v_ni: B('غير مستطب', 'Not Indicated', 'Endike Değil'),
-    v_nin: B('غير مستطب الآن', 'Not Indicated Now', 'Şu An Endike Değil'), v_na: B('غير مناسب', 'Not Appropriate', 'Uygun Değil'), v_nr: B('غير موصى به', 'Not Recommended', 'Önerilmez'),
-    v_harm: B('ضار', 'Harmful', 'Zararlı'),
     nextT: B('الخطوة التالية', 'Next Steps', 'Sonraki Adım'),
     nextB: B('هل تريد دراسة المناقشة السريرية أولاً، أم إعادة الحالة الآن؟', 'Would you like to study the clinical discussion first, or restart the case now?', 'Önce klinik tartışmayı incelemek mi, yoksa vakayı şimdi yeniden başlatmak mı istersiniz?'),
     viewDisc: B('عرض المناقشة', 'View Discussion', 'Tartışmayı Gör'),
     startAgain: B('ابدأ من جديد', 'Start Again', 'Yeniden Başla')
   };
 
-  /* verdict code -> colour class; the order also sorts the Review lists (recommended first) */
-  var VERD = { rec: 'ok', low: 'mid', nfl: 'mid', lim: 'mid', nrn: 'mid', ni: 'bad', nin: 'bad', na: 'bad', nr: 'bad', harm: 'harm' };
-  var VORD = ['rec', 'low', 'nfl', 'lim', 'nrn', 'nin', 'ni', 'na', 'nr', 'harm'];
+  /* verdict badges (Review): code -> [colour class, ar, en, tr]; the order also sorts the Review lists (recommended first).
+     v0.6: a wide fixed set, so new cases rarely need a code change; an option may also carry its own label vt {ar,en,tr}
+     (an unusual source badge) — then v only picks the colour and the sort place. */
+  var VT = {
+    rec: ['ok', 'موصى به', 'Recommended', 'Önerilir'],
+    ess: ['ok', 'أساسي', 'Essential', 'Temel'],
+    fl: ['ok', 'الخيار الأول', 'First-Line', 'İlk Basamak'],
+    std: ['ok', 'المعيار العلاجي', 'Standard of Care', 'Standart Bakım'],
+    gold: ['ok', 'المعيار الذهبي', 'Gold Standard', 'Altın Standart'],
+    pref: ['ok', 'مفضّل', 'Preferred', 'Tercih Edilir'],
+    ind: ['ok', 'مستطب', 'Indicated', 'Endike'],
+    req: ['ok', 'ضروري', 'Required', 'Gerekli'],
+    urg: ['ok', 'عاجل', 'Urgent', 'Acil'],
+    conf: ['ok', 'يؤكد التشخيص', 'Confirmatory', 'Tanıyı Doğrular'],
+    app: ['ok', 'مناسب', 'Appropriate', 'Uygun'],
+    use: ['ok', 'مفيد', 'Useful', 'Yararlı'],
+    adj: ['ok', 'مساعد', 'Adjunct', 'Yardımcı'],
+    sup: ['ok', 'داعم', 'Supportive', 'Destekleyici'],
+    alt: ['ok', 'بديل مقبول', 'Acceptable Alternative', 'Kabul Edilebilir Alternatif'],
+    cons: ['mid', 'يُنظر فيه', 'Consider', 'Düşünülebilir'],
+    sel: ['mid', 'انتقائي عند الاستطباب', 'Selective / If Indicated', 'Seçici / Gerekirse'],
+    opt: ['mid', 'اختياري', 'Optional', 'İsteğe Bağlı'],
+    sec: ['mid', 'الخيار الثاني', 'Second-Line', 'İkinci Basamak'],
+    later: ['mid', 'لاحقاً', 'Later / Deferred', 'Daha Sonra'],
+    low: ['mid', 'مردود ضعيف', 'Low Yield', 'Düşük Verim'],
+    nfl: ['mid', 'ليس الخيار الأول', 'Not First-Line', 'İlk Basamak Değil'],
+    lim: ['mid', 'دور محدود', 'Limited Role', 'Sınırlı Rol'],
+    nrn: ['mid', 'ليس روتينياً الآن', 'Not Routine Now', 'Şu An Rutin Değil'],
+    nrt: ['mid', 'ليس روتينياً', 'Not Routine', 'Rutin Değil'],
+    prem: ['mid', 'سابق لأوانه', 'Premature', 'Erken'],
+    npref: ['mid', 'غير مفضّل', 'Not Preferred', 'Tercih Edilmez'],
+    inf: ['mid', 'مقاربة أدنى', 'Inferior Approach', 'Daha Zayıf Yaklaşım'],
+    insa: ['mid', 'لا يكفي وحده', 'Insufficient Alone', 'Tek Başına Yetersiz'],
+    ins: ['mid', 'غير كافٍ', 'Insufficient', 'Yetersiz'],
+    nreq: ['bad', 'غير ضروري', 'Not Required', 'Gerekli Değil'],
+    unn: ['bad', 'غير لازم', 'Unnecessary', 'Gereksiz'],
+    nin: ['bad', 'غير مستطب الآن', 'Not Indicated Now', 'Şu An Endike Değil'],
+    ni: ['bad', 'غير مستطب', 'Not Indicated', 'Endike Değil'],
+    na: ['bad', 'غير مناسب', 'Not Appropriate', 'Uygun Değil'],
+    nr: ['bad', 'غير موصى به', 'Not Recommended', 'Önerilmez'],
+    inef: ['bad', 'غير فعّال', 'Ineffective', 'Etkisiz'],
+    out: ['bad', 'قديم', 'Outdated', 'Güncel Değil'],
+    obs: ['bad', 'مهجور', 'Obsolete', 'Terk Edilmiş'],
+    inc: ['bad', 'خاطئ', 'Incorrect', 'Yanlış'],
+    avoid: ['bad', 'يُتجنَّب', 'Avoid', 'Kaçınılmalı'],
+    delay: ['harm', 'يؤخّر العلاج', 'Delays Care', 'Tedaviyi Geciktirir'],
+    unsafe: ['harm', 'غير آمن أو غير كافٍ', 'Unsafe / Insufficient', 'Güvenli Değil / Yetersiz'],
+    unsf: ['harm', 'غير آمن', 'Unsafe', 'Güvenli Değil'],
+    dang: ['harm', 'خطِر', 'Dangerous', 'Tehlikeli'],
+    ci: ['harm', 'مضاد استطباب', 'Contraindicated', 'Kontrendike'],
+    harm: ['harm', 'ضار', 'Harmful', 'Zararlı']
+  };
+  var VERD = {}, VORD = [];
+  Object.keys(VT).forEach(function (k) { VERD[k] = VT[k][0]; VORD.push(k); L['v_' + k] = B(VT[k][1], VT[k][2], VT[k][3]); });
   function verdict(o) { return VERD[o.v] ? o.v : o.w > 0 ? 'rec' : o.w === 0 ? 'low' : o.w === -1 ? 'ni' : 'harm'; }
   /* age: infants by months when given (patient.months), otherwise years */
   function ageHtml(p) {
@@ -480,7 +526,7 @@
       return '<ol class="hw-vl">' + list.map(function (x) {
         var o = x.o, mine = !!st[group][o.id], ok = mine && (o.w > 0 ? 'ok' : o.w < 0 ? 'bad' : 'mid');
         return '<li class="hw-vl-i">' +
-          '<div class="hw-vl-h"><b>' + bi(o.t) + '</b><span class="hw-vb vb-' + VERD[x.v] + '">' + bi(L['v_' + x.v]) + '</span>' +
+          '<div class="hw-vl-h"><b>' + bi(o.t) + '</b><span class="hw-vb vb-' + VERD[x.v] + '">' + bi(o.vt && typeof o.vt === 'object' && (o.vt.en || o.vt.ar) ? o.vt : L['v_' + x.v]) + '</span>' +
             (mine ? '<span class="hw-vmine vm-' + ok + '">' + icon(o.w < 0 ? 'x' : 'check') + bi(L.youPicked) + '</span>' : '') + '</div>' +
           '<p>' + bi(o.why) + '</p></li>';
       }).join('') + '</ol>';
