@@ -1,4 +1,5 @@
-/*! ECG Academy: strip engine + Library + Cases + Practice + calipers + academy shell (tabs, deep links, related) | v0.7.1 (ar/en/tr) | requires hawi-core.js v0.4
+/*! ECG Academy: strip engine + Library + Cases + Practice + calipers + academy shell (tabs, deep links, related) | v0.7.2 (ar/en/tr) | requires hawi-core.js v0.4
+   v0.7.2: lessons tab lists the oldest lesson first
    v0.7.1: tab order from the page (data-order)
    v0.7: cases progress + mistakes through the shared H.prog('ecg') / H.log (read by the general log page); keys ecg:train, ecg:pref; old data migrated once */
 (function (w, d) {
@@ -484,7 +485,7 @@
     p.innerHTML = '<p class="ecg-hint">' + H.bi(L.loading) + '</p>';
     H.feed('ECG', 150).then(function (list) {
       if (!list.length) { p.innerHTML = soon(L.lessonsSoon); return; }
-      p.innerHTML = '<ul class="hw-links">' + list.map(function (x) { return '<li><a href="' + H.esc(x.u) + '">' + H.bi(x.t) + '</a></li>'; }).join('') + '</ul>';
+      p.innerHTML = '<ul class="hw-links">' + list.slice().reverse().map(function (x) { return '<li><a href="' + H.esc(x.u) + '">' + H.bi(x.t) + '</a></li>'; }).join('') + '</ul>';
     });
   }
   function shell(mount, data) {
