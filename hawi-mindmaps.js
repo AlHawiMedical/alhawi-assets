@@ -1,4 +1,4 @@
-/*! Mind maps hub: all maps (search + specialty) · my maps (favourites + recent) | v0.1.0 (ar/en/tr) | requires hawi-core.js v0.4.1
+/*! Mind maps hub: all maps (search + specialty) · my maps (favourites + recent) | v0.1.1 (ar/en/tr) | requires hawi-core.js v0.4.1
     Page: <div data-hawi-app="mindmaps"></div> ; tab order: data-order="maps,mine" ; tab in URL: #mine
     Data: Blogger feed of label "Mind Maps" (title "ar | en | tr"; hidden hw-snip "ar ‖ en ‖ tr ‖ mm.<sp>.<nodes>.<red> ‖");
           favourites/visits from H.prog('mindmap') (records carry t, sp, u, n, fav — written by hawi-mindmap.js). */
@@ -30,7 +30,7 @@
     '.hwm-row{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0}.hwm-chip{display:inline-flex;align-items:center;gap:6px;font:inherit;font-size:13px;padding:5px 12px;border-radius:999px;border:1px solid var(--hw-line);background:transparent;color:inherit;cursor:pointer}' +
     '.hwm-chip[aria-pressed=true]{background:var(--hw-accent);border-color:var(--hw-accent);color:#fff}.hwm-chip i{width:8px;height:8px;border-radius:50%}' +
     '.hwm-n{font-size:13px;opacity:.7;margin:4px 0 10px}.hwm-grid{display:grid;gap:12px;grid-template-columns:1fr;list-style:none;margin:0;padding:0}@media(min-width:640px){.hwm-grid{grid-template-columns:1fr 1fr}}' +
-    '.hwm-grid li{margin:0;padding:0;list-style:none}.hwm-c{position:relative;display:flex;gap:12px;padding:14px;border-radius:14px;border:1px solid var(--hw-line);border-inline-start:4px solid var(--c);color:inherit;text-decoration:none;height:100%}' +
+    '.hwm-grid>li{margin:0!important;padding:0!important;list-style:none}.hwm-c{position:relative;display:flex;gap:12px;padding:14px;border-radius:14px;border:1px solid var(--hw-line);border-inline-start:4px solid var(--c);color:inherit;text-decoration:none;height:100%}' +
     '.hwm-c:hover{border-color:var(--c)}.hwm-i{flex:none;width:40px;height:40px;border-radius:10px;display:grid;place-items:center;background:color-mix(in srgb,var(--c) 14%,transparent);color:var(--c)}' +
     '.hwm-i svg{width:24px!important;height:24px!important;max-width:none;fill:none}[dir=rtl] .hwm-i svg{transform:scaleX(-1)}.hwm-b{min-width:0;flex:1}' +
     '.hwm-sp{font-size:12px;color:var(--c);font-weight:600}.hwm-t{font-weight:700;margin:2px 0 4px}.hwm-d{font-size:13px;opacity:.8;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}' +
