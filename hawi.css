@@ -1,4 +1,4 @@
-/*! Core UI (tabs, accordion, modal) + case app + tooltips | v0.2.7 */
+/*! Core UI (tabs, accordion, modal) + case app + tooltips | v0.2.8 */
 :root{
   --hw-accent:var(--linkB,#0c9784);
   --hw-accent-ink:var(--linkC,#0a7a6b);
@@ -232,3 +232,60 @@ html[dir=rtl] .hw-vitals td{text-align:right}
 .hw-ttp-c:hover{background:var(--hw-accent-soft)}
 .hw-ttp-c.is-in{border-color:transparent;background:var(--hw-accent-soft)}
 .hw-ttp-c svg{width:15px;height:15px;fill:none!important;flex-shrink:0}
+/* ---------- case v0.5 (v0.2.8): favourite, tap-row investigations, confirm, performance index, verdicts, discussion ---------- */
+.hw-fav{align-self:flex-start;flex-shrink:0;display:grid;place-items:center;width:40px;height:40px;margin:-6px;border:0;border-radius:50%;background:none;color:var(--hw-muted);cursor:pointer}
+.hw-fav svg{width:24px;height:24px}
+.hw-fav:hover{background:var(--hw-bg-soft);color:var(--hw-bad)}
+.hw-fav:focus-visible{outline:2px solid var(--hw-accent);outline-offset:2px}
+.hw-fav[aria-pressed=true]{color:var(--hw-bad)}
+.hw-hero .hw-fav[aria-pressed=true] svg *{fill:currentColor!important}
+/* investigations: a tap row (no checkbox); ordered = bar on the leading edge + bold + tick + finding under a line */
+.hw-opts--inv .hw-box{display:none}
+.hw-opts--inv .hw-opt{position:relative;overflow:hidden;align-items:flex-start}
+.hw-tick{flex-shrink:0;display:grid;place-items:center;width:22px;height:22px;margin-top:1px;color:var(--hw-ink);opacity:0}
+.hw-tick svg{width:18px;height:18px}
+.hw-opts--inv .hw-opt[aria-checked=true]{border-color:var(--hw-line);background:var(--hw-bg-soft);box-shadow:inset 4px 0 0 var(--hw-accent)}
+html[dir=rtl] .hw-opts--inv .hw-opt[aria-checked=true]{box-shadow:inset -4px 0 0 var(--hw-accent)}
+.hw-opts--inv .hw-opt[aria-checked=true] .hw-opt-t{font-weight:700}
+.hw-opts--inv .hw-opt[aria-checked=true] .hw-tick{opacity:1}
+.hw-opt-res{display:block;margin-top:10px;padding-top:10px;border-top:1px solid var(--hw-line);font-size:14px;line-height:1.75;color:var(--hw-ink)}
+.hw-opt-rt{display:block;font-style:italic}
+html[lang=ar] .hw-opt-rt,.hw-opt-rt .lng-ar{font-style:normal}
+/* graded rows keep the v0.4 colours; the tick follows the colour */
+.hw-opts--inv .hw-opt.g-ok,.hw-opts--inv .hw-opt.g-bad,.hw-opts--inv .hw-opt.g-miss{box-shadow:none}
+.hw-opts--inv .hw-opt.g-ok .hw-tick{color:var(--hw-ok)}.hw-opts--inv .hw-opt.g-bad .hw-tick{color:var(--hw-bad)}
+.hw-conf-n{margin:8px 0 0;font-size:13.5px;color:var(--hw-muted)}
+/* performance index: correct / incorrect / missed */
+.hw-pi{margin:12px 0 4px;padding:12px 14px;border-radius:12px;border:1px solid var(--hw-line)}
+.hw-pi-h{display:flex;align-items:baseline;justify-content:space-between;gap:10px;font-size:12.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:var(--hw-muted)}
+.hw-pi-h b{font-size:20px;letter-spacing:0;color:var(--hw-ink);direction:ltr;unicode-bidi:isolate}
+.hw-pi-bar{display:flex;gap:2px;height:10px;margin:8px 0;border-radius:999px;overflow:hidden;background:var(--hw-line)}
+.hw-pi-bar i{display:block;min-width:6px}
+.hw-pi-bar .pi-ok,.hw-pi-l .pi-ok::before{background:var(--hw-ok)}
+.hw-pi-bar .pi-bad,.hw-pi-l .pi-bad::before{background:var(--hw-bad)}
+.hw-pi-bar .pi-miss,.hw-pi-l .pi-miss::before{background:var(--hw-warn)}
+.hw-pi-l{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:13px}
+.hw-pi-l span{display:inline-flex;align-items:center;gap:6px}
+.hw-pi-l span::before{content:"";width:9px;height:9px;border-radius:50%}
+.hw-res-p{color:var(--hw-warn)}
+/* Review: numbered options with verdict badges */
+.hw-vl{margin:0;padding-inline-start:24px;display:grid;gap:12px}
+.hw-vl-i{padding-inline-start:2px}
+.hw-vl-i::marker{font-weight:800;color:var(--hw-accent-ink)}
+.hw-vl-h{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;line-height:1.5}
+.hw-vl-h>b{font-size:15px}
+.hw-vl-i p{margin:4px 0 0;font-size:14px;line-height:1.7;color:var(--hw-muted)}
+.hw-vb{display:inline-block;padding:1px 8px;border-radius:6px;border:1px solid currentColor;font-size:10.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;white-space:nowrap}
+.hw-vb.vb-ok{color:var(--hw-ok);background:var(--hw-ok-soft)}
+.hw-vb.vb-mid{color:var(--hw-warn);background:var(--hw-warn-soft)}
+.hw-vb.vb-bad{color:var(--hw-bad);background:var(--hw-bad-soft)}
+.hw-vb.vb-harm{color:#fff;background:var(--hw-bad);border-color:var(--hw-bad)}
+.hw-vmine{display:inline-flex;align-items:center;gap:3px;font-size:11.5px;font-weight:700;color:var(--hw-muted)}
+.hw-vmine svg{width:13px;height:13px}
+.hw-vmine.vm-ok{color:var(--hw-ok)}.hw-vmine.vm-bad{color:var(--hw-bad)}
+/* Discussion: teaching bullets, paragraphs, finish */
+.hw-dl{margin:0;padding-inline-start:20px}
+.hw-dl li{margin:0 0 8px;line-height:1.8}
+.hw-dl li strong{color:var(--hw-ink)}
+a.hw-btn--primary,a.hw-btn--primary:hover{color:#fff;text-decoration:none}
+html[dir=rtl] .js-finish svg{transform:scaleX(-1)}

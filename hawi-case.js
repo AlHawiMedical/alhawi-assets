@@ -1,9 +1,15 @@
-/*! Clinical Case app (Play / Review / Discussion) | v0.4.0 (ar/en/tr) | requires hawi-core.js v0.4
+/*! Clinical Case app (Play / Review / Discussion) | v0.5.0 (ar/en/tr) | requires hawi-core.js v0.4
     v0.3: investigation results (r) + media, meta (level, tags), discussion links + related posts by tag,
           personal log of mistakes (data-view="progress")
     v0.3.1: no platform name in code; related posts work on any domain
     v0.4: progress + mistakes through the shared H.prog / H.log (hawi-core v0.4): tags, short texts, relative retry
-          links, read by the general log page; pre-v0.4 data migrated once (old keys kept) */
+          links, read by the general log page; pre-v0.4 data migrated once (old keys kept)
+    v0.5.0: as in the source app — investigations are tap rows (no checkbox) that show their finding (r) at once;
+          infant age in months (patient.months); submit always asks to confirm; performance index bar + "Missed:";
+          Review lists every option numbered with a verdict badge (option v, or derived from w) + Retry;
+          Discussion: authored investigation/management bullets (discussion.inv / .mgmt), summary paragraphs,
+          "Finish Session" (to the cases hub) instead of "Back to Top" (the theme has its own); favourite heart
+          (stored in case:data → synced with the account) */
 (function (w, d) {
   'use strict';
   var H = w.Hawi; if (!H || !H.prog) return; /* needs hawi-core v0.4 */
@@ -46,7 +52,49 @@
     wrongPicks: B('اختيارات ضارة أو غير مناسبة', 'Harmful or unneeded picks', 'Zararlı veya gereksiz seçimler'),
     open: B('افتح الحالة', 'Open case', 'Vakayı aç'), clearLog: B('امسح السجل', 'Clear log', 'Kaydı temizle'),
     clearQ: B('سيُحذف سجل الحالات والدرجات من هذا الجهاز. متابعة؟', 'This deletes your case log and scores on this device. Continue?', 'Bu cihazdaki vaka kaydınız ve puanlarınız silinecek. Devam edilsin mi?'),
-    eduNote: B('محتوى تعليمي للطلاب والأطباء، لا يغني عن الدليل العلاجي المحلي ولا عن تقييم المريض.', 'Educational content; it does not replace local guidelines or patient assessment.', 'Öğrenciler ve hekimler için eğitim içeriğidir; yerel kılavuzların ve hasta değerlendirmesinin yerini tutmaz.')
+    eduNote: B('محتوى تعليمي للطلاب والأطباء، لا يغني عن الدليل العلاجي المحلي ولا عن تقييم المريض.', 'Educational content; it does not replace local guidelines or patient assessment.', 'Öğrenciler ve hekimler için eğitim içeriğidir; yerel kılavuzların ve hasta değerlendirmesinin yerini tutmaz.'),
+    /* v0.5 */
+    mos: B('شهراً', 'months', 'aylık'),
+    confT: B('إرسال اختياراتك؟', 'Submit Selections?', 'Seçimler Gönderilsin mi?'),
+    confB: B('هل أنت مستعد لتقييم استقصاءاتك وخطة التدبير التي اخترتها؟', 'Are you ready to evaluate your clinical investigations and management plan?', 'Tetkik ve tedavi planınızın değerlendirilmesine hazır mısınız?'),
+    yesSubmit: B('نعم، أرسل', 'Yes, Submit', 'Evet, Gönder'),
+    perfIdx: B('مؤشر الأداء', 'Performance Index', 'Performans Endeksi'),
+    nOk: B('صحيح', 'Correct', 'Doğru'), nBad: B('خطأ', 'Incorrect', 'Yanlış'), nMiss: B('فاتك', 'Missed', 'Atlandı'),
+    missedP: B('فاتك:', 'Missed:', 'Atlandı:'),
+    feedback: B('عرض تفاصيل التقييم', 'View Feedback Details', 'Geri Bildirim Ayrıntıları'),
+    invRev: B('الاستقصاءات', 'Investigations', 'Tetkikler'), mgmtRev: B('التدبير', 'Management', 'Tedavi'),
+    youPicked: B('اخترته', 'You chose this', 'Seçtiniz'),
+    takeHome: B('رسائل للحفظ', 'Key Take-Home Messages', 'Akılda Kalması Gerekenler'),
+    finish: B('إنهاء الجلسة', 'Finish Session', 'Oturumu Bitir'),
+    favAdd: B('أضف إلى المفضلة', 'Add to favourites', 'Favorilere ekle'), favDel: B('أزل من المفضلة', 'Remove from favourites', 'Favorilerden çıkar'),
+    /* verdict badges (Review): option v, or derived from w */
+    v_rec: B('موصى به', 'Recommended', 'Önerilir'), v_low: B('مردود ضعيف', 'Low Yield', 'Düşük Verim'),
+    v_nfl: B('ليس الخيار الأول', 'Not First-Line', 'İlk Basamak Değil'), v_lim: B('دور محدود', 'Limited Role', 'Sınırlı Rol'),
+    v_nrn: B('ليس روتينياً الآن', 'Not Routine Now', 'Şu An Rutin Değil'), v_ni: B('غير مستطب', 'Not Indicated', 'Endike Değil'),
+    v_na: B('غير مناسب', 'Not Appropriate', 'Uygun Değil'), v_nr: B('غير موصى به', 'Not Recommended', 'Önerilmez'),
+    v_harm: B('ضار', 'Harmful', 'Zararlı')
+  };
+
+  /* verdict code -> colour class; the order also sorts the Review lists (recommended first) */
+  var VERD = { rec: 'ok', low: 'mid', nfl: 'mid', lim: 'mid', nrn: 'mid', ni: 'bad', na: 'bad', nr: 'bad', harm: 'harm' };
+  var VORD = ['rec', 'low', 'nfl', 'lim', 'nrn', 'ni', 'na', 'nr', 'harm'];
+  function verdict(o) { return VERD[o.v] ? o.v : o.w > 0 ? 'rec' : o.w === 0 ? 'low' : o.w === -1 ? 'ni' : 'harm'; }
+  /* age: infants by months when given (patient.months), otherwise years */
+  function ageHtml(p) {
+    var mo = p && p.months;
+    return typeof mo === 'number' && mo >= 0 && (!(p.age > 2)) ? H.esc(mo) + ' ' + bi(L.mos) : H.esc(p && p.age) + ' ' + bi(L.yrs);
+  }
+  var EXIT = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h4.5A1.5 1.5 0 0 1 20 5.5v13a1.5 1.5 0 0 1-1.5 1.5H14"/><path d="M10 16l-4-4 4-4M6 12h10"/></svg>';
+  var HEART = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20.5s-7.5-4.6-9.3-9.4C1.4 7.6 3.7 4.5 7 4.5c2 0 3.6 1.1 5 3 1.4-1.9 3-3 5-3 3.3 0 5.6 3.1 4.3 6.6-1.8 4.8-9.3 9.4-9.3 9.4z"/></svg>';
+  /* favourites: case:data {v, fav:{<post path>:{t, at}}} — the 'data' kind syncs with the account; the hub reads it */
+  var FAV = {
+    all: function () { var x = H.store.get('case:data', null); return x && x.fav ? x.fav : {}; },
+    has: function (u) { return !!FAV.all()[u]; },
+    toggle: function (u, t) {
+      var x = H.store.get('case:data', null) || { v: 1 }; x.fav = x.fav || {};
+      if (x.fav[u]) delete x.fav[u]; else x.fav[u] = { t: t || null, at: Date.now() };
+      H.store.set('case:data', x); return !!x.fav[u];
+    }
   };
 
   /* original, neutral avatar (replace with the case image via data.image) */
@@ -167,6 +215,8 @@
     if (!data) return;
     /* previews (encoder tool) keep a device-only record and never reach the progress/log */
     var pv = /^preview-/.test(data.id), key = 'case:' + data.id, rec = pv ? null : P.get(data.id);
+    /* the cases hub ("Finish Session"); a relative path, so no domain is written in the code */
+    var HUB = mount.getAttribute('data-hub') || '/p/clinical-cases.html';
     var saved = pv ? H.store.get(key, { best: null, attempts: 0, last: null }) :
       { best: rec ? rec.best : null, attempts: rec ? rec.n : 0, last: rec && rec.ans ? { inv: rec.ans.inv || [], mgmt: rec.ans.mgmt || [], score: rec.last } : null };
     function save(score) {
@@ -190,14 +240,27 @@
           '<div class="hw-ava">' + (data.image ? '<img alt="" src="' + H.esc(data.image) + '">' : AVA) + '</div>' +
           '<div class="hw-hero-t"><div class="hw-hero-spec">' + bi(data.specialty) + '</div>' +
             '<h2>' + bi(data.title) + '</h2>' +
-            '<div class="hw-hero-meta">' + H.esc(p.age) + ' ' + bi(L.yrs) + ' · ' + bi(p.sex === 'f' ? L.f : L.m) +
+            '<div class="hw-hero-meta">' + ageHtml(p) + ' · ' + bi(p.sex === 'f' ? L.f : L.m) +
               (lvl ? ' <span class="hw-lvl lv-' + lvl + '">' + bi(L['lv' + lvl]) + '</span>' : '') + '</div>' +
             '<div class="hw-hero-cc">' + bi(data.complaint) + '</div></div>' +
           '<div class="hw-best"><b class="js-best">' + (saved.best == null ? '—' : saved.best) + '</b>' + bi(L.best) + '</div>' +
+          '<button type="button" class="hw-fav js-fav" aria-pressed="false">' + HEART + '</button>' +
         '</header>' +
         '<div class="js-steps"></div>' +
       '</article>';
     bindMedia(mount);
+
+    /* favourite heart (previews: on screen only) */
+    (function () {
+      var b = mount.querySelector('.js-fav'), u = H.path(), on = !pv && FAV.has(u);
+      function show() {
+        b.setAttribute('aria-pressed', on ? 'true' : 'false');
+        b.setAttribute('aria-label', H.t(on ? L.favDel : L.favAdd)); b.title = H.t(on ? L.favDel : L.favAdd);
+      }
+      show();
+      b.addEventListener('click', function () { on = pv ? !on : FAV.toggle(u, data.title); show(); });
+      d.addEventListener('hawi:lang', show);
+    })();
 
     var tabs = H.tabs(mount.querySelector('.js-steps'), {
       id: 'case-' + data.id, variant: 'steps', numbered: true, hash: !!data.hash,
@@ -215,7 +278,7 @@
     function renderPlay(panel) {
       panel.innerHTML =
         '<section class="hw-card"><h3>' + bi(data.presentation) + '</h3>' +
-          '<div class="hw-sub">' + H.esc(p.age) + ' ' + bi(L.yrs) + ' · ' + bi(p.sex === 'f' ? L.f : L.m) + '</div>' +
+          '<div class="hw-sub">' + ageHtml(p) + ' · ' + bi(p.sex === 'f' ? L.f : L.m) + '</div>' +
           '<div class="hw-stem">' + bi(data.stem) + '</div></section>' +
         '<section class="hw-card" style="padding:0;overflow:hidden"><table class="hw-vitals"><tbody>' +
           (data.vitals || []).map(function (v) { return '<tr><th scope="row">' + bi(v.k) + '</th><td>' + H.esc(v.v) + '</td></tr>'; }).join('') +
@@ -241,33 +304,52 @@
       btn.disabled = st.graded;
       if (st.graded) panel.querySelector('.hw-submit').hidden = true;
       btn.addEventListener('click', function () {
-        if (!Object.keys(st.inv).length && !Object.keys(st.mgmt).length) {
+        var ni = Object.keys(st.inv).length, nm = Object.keys(st.mgmt).length;
+        if (!ni && !nm) {
           H.modal({ icon: 'alert', title: L.emptyT, body: '<p>' + bi(L.emptyB) + '</p>', actions: [
             { label: L.back },
             { label: L.anyway, kind: 'danger', onClick: function (c) { c(); submit(); } }] });
-        } else submit();
+        } else {
+          /* as in the source app: always confirm before grading */
+          H.modal({ title: L.confT, body: '<p>' + bi(L.confB) + '</p><p class="hw-conf-n">' + bi(L.inv) + ': <b>' + ni + '</b> · ' + bi(L.mgmt) + ': <b>' + nm + '</b></p>',
+            actions: [
+              { label: L.back },
+              { label: L.yesSubmit, kind: 'primary', onClick: function (c) { c(); submit(); } }] });
+        }
       });
     }
 
+    /* investigations (as in the source app): a tap row without a checkbox; once ordered it shows a side bar, a tick
+       and its finding (r / media) at once — the finding never says right or wrong. Management keeps its checkboxes. */
+    function invFinding(o) {
+      var m = mediaHtml(o.media);
+      return o.r || m ? '<span class="hw-opt-res">' + (o.r ? '<span class="hw-opt-rt">' + bi(o.r) + '</span>' : '') + m + '</span>' : '';
+    }
     function optList(box, group, opts) {
-      box.innerHTML = '<div class="hw-opts' + (st.graded ? ' is-graded' : '') + '"></div>';
+      var inv = group === 'inv';
+      box.innerHTML = '<div class="hw-opts' + (inv ? ' hw-opts--inv' : '') + (st.graded ? ' is-graded' : '') + '"></div>';
       var wrap = box.firstChild;
       opts.forEach(function (o) {
-        var b = d.createElement('button');
-        b.type = 'button'; b.className = 'hw-opt'; b.setAttribute('role', 'checkbox');
+        var b = d.createElement('div');
+        b.className = 'hw-opt'; b.setAttribute('role', 'checkbox'); b.tabIndex = 0;
         b.setAttribute('aria-checked', st[group][o.id] ? 'true' : 'false');
         b.dataset.id = o.id;
         b.innerHTML = '<span class="hw-box">' + icon('check') + '</span><span class="hw-opt-b"><span class="hw-opt-t">' + bi(o.t) +
           '</span><span class="hw-opt-tag"></span><span class="hw-opt-why">' + bi(o.why) + '</span>' +
-          (st.graded && group === 'inv' && st.inv[o.id] ? resultHtml(o) : '') + '</span>';
+          (inv ? '<span class="js-res">' + (st.inv[o.id] ? invFinding(o) : '') + '</span>' : '') + '</span>' +
+          (inv ? '<span class="hw-tick">' + icon('check') + '</span>' : '');
         if (st.graded) gradeOpt(b, o, !!st[group][o.id]);
-        b.addEventListener('click', function () {
+        function toggle(e) {
           if (st.graded) return;
+          if (e && e.target.closest && e.target.closest('.hw-media,.hw-tt')) return; /* image zoom / glossary word */
           var on = !st[group][o.id];
           if (on) st[group][o.id] = 1; else delete st[group][o.id];
           b.setAttribute('aria-checked', on ? 'true' : 'false');
+          if (inv) b.querySelector('.js-res').innerHTML = on ? invFinding(o) : '';
           var pl = tabs.panel('play'); if (pl && pl._counts) pl._counts();
-        });
+        }
+        b.addEventListener('click', toggle);
+        b.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(e); } });
         wrap.appendChild(b);
       });
     }
@@ -313,15 +395,25 @@
       showPerf();
     }
 
-    function resList(items, cls, ic, withWhy) {
+    function resList(items, cls, ic, withWhy, pre) {
       if (!items.length) return '';
       return items.map(function (o) {
-        return '<li class="' + cls + '">' + icon(ic) + '<span>' + bi(o.t) + (withWhy ? '<br><small>' + bi(o.why) + '</small>' : '') + '</span></li>';
+        return '<li class="' + cls + '">' + icon(ic) + '<span>' + (pre ? '<b class="hw-res-p">' + bi(pre) + '</b> ' : '') + bi(o.t) + (withWhy ? '<br><small>' + bi(o.why) + '</small>' : '') + '</span></li>';
       }).join('');
     }
     function groupRes(title, g) {
-      var body = resList(g.ok, 'r-ok', 'check') + resList(g.bad, 'r-bad', 'x', true) + resList(g.miss, 'r-miss', 'alert');
+      var body = resList(g.ok, 'r-ok', 'check') + resList(g.bad, 'r-bad', 'x', true) + resList(g.miss, 'r-miss', 'alert', false, L.missedP);
       return '<div class="hw-res-h">' + bi(title) + '</div><ul class="hw-res">' + (body || '<li>' + bi(L.none) + '</li>') + '</ul>';
+    }
+    /* performance index: one bar split into correct / incorrect / missed (counts of options) */
+    function perfIndex(r) {
+      var ok = r.inv.ok.length + r.mgmt.ok.length, bad = r.inv.bad.length + r.mgmt.bad.length, miss = r.inv.miss.length + r.mgmt.miss.length, n = ok + bad + miss;
+      function seg(c, k) { return c ? '<i class="pi-' + k + '" style="flex:' + c + '"></i>' : ''; }
+      return '<div class="hw-pi"><div class="hw-pi-h"><span>' + bi(L.perfIdx) + '</span><b>' + r.score + ' / 100</b></div>' +
+        '<div class="hw-pi-bar" role="img" aria-label="' + H.esc(H.t(L.nOk) + ' ' + ok + ', ' + H.t(L.nBad) + ' ' + bad + ', ' + H.t(L.nMiss) + ' ' + miss) + '">' +
+          (n ? seg(ok, 'ok') + seg(bad, 'bad') + seg(miss, 'miss') : '') + '</div>' +
+        '<div class="hw-pi-l"><span class="pi-ok">' + bi(L.nOk) + ' <b>' + ok + '</b></span><span class="pi-bad">' + bi(L.nBad) + ' <b>' + bad + '</b></span>' +
+          '<span class="pi-miss">' + bi(L.nMiss) + ' <b>' + miss + '</b></span></div></div>';
     }
     function ring(score) {
       var c = score >= 75 ? 'var(--hw-ok)' : score >= 40 ? 'var(--hw-warn)' : 'var(--hw-bad)';
@@ -331,10 +423,10 @@
       var r = st.result;
       H.modal({
         title: L.perfT,
-        body: '<div class="hw-score">' + ring(r.score) + '<p>' + bi(L.perfNote) + '</p></div>' + groupRes(L.inv, r.inv) + groupRes(L.mgmt, r.mgmt),
+        body: '<div class="hw-score">' + ring(r.score) + '<p>' + bi(L.perfNote) + '</p></div>' + perfIndex(r) + groupRes(L.inv, r.inv) + groupRes(L.mgmt, r.mgmt),
         actions: [
           { label: L.close },
-          { label: L.toReview, kind: 'accent', onClick: function (c) { c(); tabs.select('review', { focus: true }); } }]
+          { label: L.feedback, kind: 'accent', onClick: function (c) { c(); tabs.select('review', { focus: true }); } }]
       });
     }
 
@@ -345,7 +437,9 @@
       panel.innerHTML =
         (r ? '<section class="hw-card"><div class="hw-score" style="margin:0">' + ring(r.score) +
           '<p><b>' + bi(L.yourResult) + '</b><br>' + bi(L.best) + ': ' + saved.best + ' · ' + bi(L.attempts) + ': ' + saved.attempts + '</p></div></section>' : '') +
-        '<div class="js-acc"></div>';
+        '<div class="js-acc"></div>' +
+        '<div class="hw-acts"><button type="button" class="hw-btn hw-btn--primary js-retry">' + icon('redo') + bi(L.retry) + '</button></div>';
+      panel.querySelector('.js-retry').addEventListener('click', retry);
       var invOpts = data.investigations.options, hasRes = invOpts.some(function (o) { return o.r || (o.media && o.media.src); });
       var mine = invOpts.filter(function (o) { return st.inv[o.id]; });
       H.accordion(panel.querySelector('.js-acc'), (hasRes ? [
@@ -355,8 +449,23 @@
         { id: 'p', title: L.problem, open: true, html: '<p>' + bi(rv.problem) + '</p>' },
         { id: 'd', title: L.ddx, open: true, html: '<div class="hw-ddx">' + (rv.ddx || []).map(function (x) {
             return '<div class="hw-ddx-i l-' + (x.l || 'low') + '"><b>' + bi(x.n) + '<small>' + bi(lv[x.l] || L.lLow) + '</small></b><p>' + bi(x.f) + '</p></div>';
-          }).join('') + '</div>' }
+          }).join('') + '</div>' },
+        { id: 'vi', title: L.invRev, open: true, html: verdictList('inv', invOpts) },
+        { id: 'vm', title: L.mgmtRev, open: true, html: verdictList('mgmt', data.management.options) }
       ]));
+    }
+    /* every option, numbered, recommended first, with its verdict badge and one-line reason; the student's picks marked */
+    function verdictList(group, opts) {
+      var list = opts.map(function (o, i) { return { o: o, v: verdict(o), i: i }; }).sort(function (a, b) {
+        return (b.o.w - a.o.w) || (VORD.indexOf(a.v) - VORD.indexOf(b.v)) || (a.i - b.i);
+      });
+      return '<ol class="hw-vl">' + list.map(function (x) {
+        var o = x.o, mine = !!st[group][o.id], ok = mine && (o.w > 0 ? 'ok' : o.w < 0 ? 'bad' : 'mid');
+        return '<li class="hw-vl-i">' +
+          '<div class="hw-vl-h"><b>' + bi(o.t) + '</b><span class="hw-vb vb-' + VERD[x.v] + '">' + bi(L['v_' + x.v]) + '</span>' +
+            (mine ? '<span class="hw-vmine vm-' + ok + '">' + icon(o.w < 0 ? 'x' : 'check') + bi(L.youPicked) + '</span>' : '') + '</div>' +
+          '<p>' + bi(o.why) + '</p></li>';
+      }).join('') + '</ol>';
     }
 
     /* ---------- DISCUSSION ---------- */
@@ -366,17 +475,35 @@
         return '<div class="hw-opt ' + cls + '"><span class="hw-box">' + icon(o.w > 0 ? 'check' : 'x') + '</span><span class="hw-opt-b"><span class="hw-opt-t">' + bi(o.t) + '</span><span class="hw-opt-why">' + bi(o.why) + '</span>' + resultHtml(o) + '</span></div>';
       }).join('') + '</div>';
     }
+    /* a text that may hold several paragraphs (blank line between them) in each language */
+    function paras(v) {
+      if (v == null) return '';
+      if (typeof v !== 'object') v = { ar: v, en: v };
+      var parts = {}, n = 0;
+      H.LANGS.forEach(function (l) { if (v[l] != null) { parts[l] = String(v[l]).split(/\n\s*\n/); n = Math.max(n, parts[l].length); } });
+      if (n < 2) return '<p>' + bi(v) + '</p>';
+      var out = '';
+      for (var i = 0; i < n; i++) {
+        var o = {}; H.LANGS.forEach(function (l) { if (parts[l]) o[l] = parts[l][i] || ''; });
+        out += '<p>' + bi(o) + '</p>';
+      }
+      return out;
+    }
+    function bullets(arr) { return '<ul class="hw-dl">' + arr.map(function (k) { return '<li>' + bi(k) + '</li>'; }).join('') + '</ul>'; }
     function renderDiscussion(panel) {
       var ds = data.discussion || {};
+      var dInv = Array.isArray(ds.inv) && ds.inv.length, dMgmt = Array.isArray(ds.mgmt) && ds.mgmt.length;
+      /* one way up only: the theme already has its own back-to-top circle; the session ends at the cases hub */
       panel.innerHTML = '<div class="hw-dx"><small>' + bi(L.finalDx) + '</small>' + bi(ds.dx) + '</div><div class="js-acc"></div>' +
         '<div class="hw-acts"><button type="button" class="hw-btn js-retry">' + icon('redo') + bi(L.retry) + '</button>' +
-        '<button type="button" class="hw-btn hw-btn--primary js-top">' + icon('up') + bi(L.top) + '</button></div>' +
+        '<a class="hw-btn hw-btn--primary js-finish" href="' + H.esc(HUB) + '">' + EXIT + bi(L.finish) + '</a></div>' +
         '<p class="hw-note">' + bi(L.eduNote) + '</p>';
       H.accordion(panel.querySelector('.js-acc'), [
-        { id: 's', title: L.summary, open: true, html: '<p>' + bi(ds.summary) + '</p>' },
-        { id: 'i', title: L.invExp, html: why(data.investigations.options) },
-        { id: 'm', title: L.mgmtExp, html: why(data.management.options) },
-        { id: 'k', title: L.keys, html: '<ul>' + (ds.keypoints || []).map(function (k) { return '<li>' + bi(k) + '</li>'; }).join('') + '</ul>' },
+        { id: 's', title: L.summary, open: true, html: paras(ds.summary) },
+        /* authored teaching bullets when the case has them (v2.2), otherwise the options with their reasons (older cases) */
+        { id: 'i', title: dInv ? L.invRev : L.invExp, open: !!dInv, html: dInv ? bullets(ds.inv) : why(data.investigations.options) },
+        { id: 'm', title: dMgmt ? L.mgmtRev : L.mgmtExp, open: !!dMgmt, html: dMgmt ? bullets(ds.mgmt) : why(data.management.options) },
+        { id: 'k', title: dInv || dMgmt ? L.takeHome : L.keys, open: !!(dInv || dMgmt), html: '<ul>' + (ds.keypoints || []).map(function (k) { return '<li>' + bi(k) + '</li>'; }).join('') + '</ul>' },
         { id: 'r', title: L.refs, html: '<ol class="hw-refs">' + (ds.refs || []).map(function (r) {
             return '<li>' + (r.u ? '<a href="' + H.esc(r.u) + '" target="_blank" rel="noopener">' + H.esc(r.t) + '</a>' : H.esc(r.t)) + '</li>';
           }).join('') + '</ol>' }
@@ -391,7 +518,11 @@
         } }];
       })()), { soft: true });
       panel.querySelector('.js-retry').addEventListener('click', retry);
-      panel.querySelector('.js-top').addEventListener('click', function () { mount.scrollIntoView({ behavior: 'smooth', block: 'start' }); });
+      /* outside Blogger (encoder preview) there is no hub page: just go back to the top of the case */
+      panel.querySelector('.js-finish').addEventListener('click', function (e) {
+        if (H.isBlog && H.isBlog()) return;
+        e.preventDefault(); mount.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
     }
 
     function retry() {
