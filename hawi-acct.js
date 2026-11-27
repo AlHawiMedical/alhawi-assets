@@ -1,7 +1,8 @@
 /*! © 2026 Dr. Hassan Alduvayhi — All rights reserved. Unauthorized copying or reuse is prohibited.
     Accounts: header sign-in icon (every page), sign-in window (Google + email, ar/en/tr),
-    sync of progress + mistakes log with the account (Firestore) | v0.1.3 | uses hawi-core.js v0.4 (loaded on demand)
+    sync of progress + mistakes log with the account (Firestore) | v0.1.4 | uses hawi-core.js v0.4 (loaded on demand)
     v0.1.3: SHAM Cards icon in the header (every page) with the number of cards to review today
+    v0.1.4: header fits small phones (search icon hidden ≤500px — the bottom menu has search; smaller title ≤400px)
     Data: users/{uid} {name,email,photo,seen} (tier* is read, never written here) ·
           users/{uid}/apps/{app} {prog,log,train,data: JSON text, at, dev} — one document per app. */
 (function (w, d) {
@@ -324,6 +325,10 @@
   var GSVG = '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" class="hwA-gl"><path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.5h6.5a5.6 5.6 0 0 1-2.4 3.6v3h3.9c2.2-2.1 3.5-5.1 3.5-8.8z"/><path fill="#34A853" d="M12 24c3.2 0 6-1.1 8-2.9l-3.9-3c-1.1.7-2.5 1.2-4.1 1.2-3.1 0-5.8-2.1-6.7-5H1.3v3.1A12 12 0 0 0 12 24z"/><path fill="#FBBC05" d="M5.3 14.3a7.2 7.2 0 0 1 0-4.6V6.6h-4a12 12 0 0 0 0 10.8l4-3.1z"/><path fill="#EA4335" d="M12 4.8c1.8 0 3.3.6 4.6 1.8l3.4-3.4A12 12 0 0 0 1.3 6.6l4 3.1c.9-2.9 3.6-4.9 6.7-4.9z"/></svg>';
   var CSS = '' +
     '.headIc .isPrf{display:none!important}' +
+    /* v0.1.4 phones: the header did not fit (icons pushed off the screen, worst in English): the search icon is hidden
+       (the bottom menu has search), the title shrinks and ends with … if it still does not fit */
+    '@media screen and (max-width:500px){.headIc .isSrh{display:none!important}.headL{width:auto!important;min-width:0;flex:1 1 0}.headL .headN{min-width:0}.headR{padding-inline-end:14px!important}}' +
+    '@media screen and (max-width:400px){.headH{font-size:17px!important}.headL{padding-inline-start:10px!important}.headIc{gap:2px!important}}' +
     '.isAcct [hidden]{display:none!important}' +
     '.hw-modal-x{display:inline-flex!important;align-items:center;justify-content:center;padding:0!important;line-height:1!important;flex-shrink:0}' +
     '.hw-modal-x svg{width:16px;height:16px;display:block}' +

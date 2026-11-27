@@ -1,4 +1,4 @@
-/*! Core UI (tabs, accordion, modal) + case app + tooltips | v0.2.8 */
+/*! Core UI (tabs, accordion, modal) + case app + tooltips | v0.2.9 */
 :root{
   --hw-accent:var(--linkB,#0c9784);
   --hw-accent-ink:var(--linkC,#0a7a6b);
@@ -289,3 +289,18 @@ html[lang=ar] .hw-opt-rt,.hw-opt-rt .lng-ar{font-style:normal}
 .hw-dl li strong{color:var(--hw-ink)}
 a.hw-btn--primary,a.hw-btn--primary:hover{color:#fff;text-decoration:none}
 html[dir=rtl] .js-finish svg{transform:scaleX(-1)}
+/* ---------- v0.2.9: phones — submit bar above the theme's bottom menu, clear of the back-to-top circle; no stuck hover ---------- */
+/* the theme sets --mobNavH (55/65px) when its bottom menu is shown (≤500px); the bar stops above it instead of covering it */
+.hw-submit{bottom:var(--mobNavH,0px)}
+@media screen and (max-width:896px){
+  /* the theme's round back-to-top button sits at the inline-end corner: keep the button beside it, paint nothing over it */
+  .hw-submit{padding-inline-end:64px;background:none;pointer-events:none}
+  .hw-submit .hw-btn{pointer-events:auto;box-shadow:0 6px 18px -6px rgba(0,0,0,.45)}
+}
+/* option rows are <div> since v0.5 (buttons were border-box by default; themes without a global reset made them taller and wider) */
+.hw-opts .hw-opt{box-sizing:border-box}
+/* touch screens keep :hover after a tap, so a tapped row looked selected; hover colours only where a mouse exists */
+@media (hover:none){
+  .hw-opt:hover:not([aria-checked=true]):not(.g-ok):not(.g-bad):not(.g-miss){border-color:var(--hw-line)}
+  .is-graded .hw-opt.g-ok:hover{border-color:var(--hw-ok)}.is-graded .hw-opt.g-bad:hover{border-color:var(--hw-bad)}.is-graded .hw-opt.g-miss:hover{border-color:var(--hw-warn)}
+}
