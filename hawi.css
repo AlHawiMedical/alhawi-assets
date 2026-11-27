@@ -290,11 +290,13 @@ html[lang=ar] .hw-opt-rt,.hw-opt-rt .lng-ar{font-style:normal}
 a.hw-btn--primary,a.hw-btn--primary:hover{color:#fff;text-decoration:none}
 html[dir=rtl] .js-finish svg{transform:scaleX(-1)}
 /* ---------- v0.2.9: phones — submit bar above the theme's bottom menu, clear of the back-to-top circle; no stuck hover ---------- */
-/* the theme sets --mobNavH (55/65px) when its bottom menu is shown (≤500px); the bar stops above it instead of covering it */
-.hw-submit{bottom:var(--mobNavH,0px)}
+/* the theme sets --mobNavH (55/65px) when its bottom menu is shown (≤500px) and 0 when it is off: the bar stops just above
+   the menu and follows it smoothly. The menu (.mobM) has z-index 3: the bar stays below it (z-index 2), so whenever the two
+   meet — the menu sliding in or out, the end of the page — the bar passes BEHIND the menu, never over it. */
+.hw-submit{bottom:var(--mobNavH,0px);z-index:2;transition:bottom .3s ease}
 @media screen and (max-width:896px){
-  /* the theme's round back-to-top button sits at the inline-end corner: keep the button beside it, paint nothing over it */
-  .hw-submit{padding-inline-end:64px;background:none;pointer-events:none}
+  /* full-width button; no painted strip around it, so nothing hides what floats beside it (back-to-top circle) */
+  .hw-submit{background:none;pointer-events:none}
   .hw-submit .hw-btn{pointer-events:auto;box-shadow:0 6px 18px -6px rgba(0,0,0,.45)}
 }
 /* option rows are <div> since v0.5 (buttons were border-box by default; themes without a global reset made them taller and wider) */
